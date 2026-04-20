@@ -29,3 +29,4 @@ markdownify
 pypdf
 pyyaml
 python-dotenv
+streamlit

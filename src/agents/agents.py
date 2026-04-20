@@ -1,7 +1,6 @@
 import dotenv
 import yaml
 
-from pydantic import BaseModel, Field
 from src.agents.llm import llm
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -18,29 +17,22 @@ orchestrator_prompt = ChatPromptTemplate.from_messages(
     ]
 )
 orchestrator_agent = orchestrator_prompt | llm | StrOutputParser()
-#-------------------------------SQLAgent-------------------------------------------------------------]
-sql_prompt = ChatPromptTemplate.from_messages(
+#-------------------------------Web Searcher------------------------------------------------------]
+web_searcher_prompt = ChatPromptTemplate.from_messages(
     [
-        ("system", prompts["sql_agent"]["prompt"]),
-        ("human", "Context: {context}"),
+        ("system", prompts["web_searcher"]["prompt"]),
+        ("human", "Question: {question}\nOrchestrator's Plan: {plan}"),
     ]
 )
-sql_agent = sql_prompt | llm | StrOutputParser()
-#-------------------------------VisualizationAgent------------------------------------------------]
-class VisualizationOutput(BaseModel):
-    script: str = Field(
-        description="The script to generate the visualization."
-    )
-    file_name: str = Field(
-        description="The name of the file where the visualization is stored."
-    )
-visualization_prompt = ChatPromptTemplate.from_messages(
+web_searcher_agent = web_searcher_prompt | llm | StrOutputParser()
+#-------------------------------Research Analyst--------------------------------------------------]
+research_analyst_prompt = ChatPromptTemplate.from_messages(
     [
-        ("system", prompts["visualization_agent"]["prompt"]),
-        ("human", "Context: {context}"),
+        ("system", prompts["research_analyst"]["prompt"]),
+        ("human", "Question: {question}\nSearch Results:\n{search_results}"),
     ]
 )
-visualization_agent = visualization_prompt | llm.with_structured_output(VisualizationOutput)
+research_analyst_agent = research_analyst_prompt | llm | StrOutputParser()
 #-------------------------------AnswerRefiner------------------------------------------------]
 answer_refiner_prompt = ChatPromptTemplate.from_messages(
     [
@@ -57,4 +49,3 @@ speaker_selector_prompt = ChatPromptTemplate.from_messages(
     ]
 )
 speaker_selector_agent = speaker_selector_prompt | llm | StrOutputParser()
-

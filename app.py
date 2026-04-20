@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import time
-import os
 
 from ui.display_utils.utils import sample_questions, display_title
 
@@ -31,10 +30,8 @@ def main():
     display_title()
     # Sidebar content
     with st.sidebar:
-        st.image("ui/assets/EY_Logo_Beam_Tag_Stacked_RGB_White_Yellow.png", width=150)
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.sidebar.title("🤖 Competitive Intelligence Assistant")
-        st.write("This assistant can provide insights, retrieve and plot data about the Big Four Consulting companies.")
+        st.sidebar.title("Multi-Agent Chatbot")
+        st.write("A general-purpose chatbot powered by a multi-agent LangGraph architecture.")
     
     # Use the Quick Questions section
     selected_question = sample_questions()
@@ -67,8 +64,6 @@ def main():
                 case "assistant":
                     with st.chat_message("assistant"):
                         st.write(message["content"])
-                        if "image" in message:
-                            st.image(message["image"], caption=message["image"])
 
     # Handle new user input
     if user_input and not st.session_state.waiting_for_response:
@@ -93,17 +88,10 @@ def main():
 
             if status == "Completed" and result["result"].get("answer") is not None:
                 answer = result["result"].get("answer")
-                exchange = {
+                st.session_state.display_history.append({
                     "role": "assistant",
                     "content": answer
-                }
-                generated_file = result["result"].get("generated_file", "")
-                print(f"generated_file: {generated_file}")
-                if os.path.exists(generated_file):
-                    print("File exists")
-                    exchange["image"] = generated_file
-                 
-                st.session_state.display_history.append(exchange)
+                })
                 st.session_state.task_id = None
                 st.session_state.waiting_for_response = False
 

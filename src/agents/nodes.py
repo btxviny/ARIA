@@ -1,41 +1,60 @@
+import os
 from typing import Any, Dict
 
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.graph import END
 from langgraph.types import Command
 from loguru import logger
+from tavily import TavilyClient
 
 from src.agents.agents import (
     orchestrator_agent,
-    sql_agent,
-    visualization_agent,
     speaker_selector_agent,
+    web_searcher_agent,
+    research_analyst_agent,
     answer_refiner_agent
 )
 from src.agents.state import GraphState
-from src.agents.utils import load_resources, format_history, process_and_run_script, execute_sql_query
+from src.agents.utils import format_history
 
-# Load resources (job posts and news metadata)
-job_posts_df_metadata, news_df_metadata = load_resources()
+VALID_SPEAKERS = {"orchestrator", "web_searcher", "research_analyst", "answer_refiner", "END"}
+
+tavily_client = TavilyClient(api_key=os.environ.get("TAVILY_API_KEY"))
+
+
+def _parse_speaker(raw: str) -> str:
+    """Extract a valid speaker name from the LLM output."""
+    cleaned = raw.strip().lower()
+    for valid in VALID_SPEAKERS:
+        if valid.lower() in cleaned:
+            return valid
+    return None
+
 
 def speaker_selector_node(state: GraphState) -> str:
-    """
-    Selects the speaker for the next message.
-    """
-    # If answer_refiner has already responded, terminate the conversation
     if state.get("resolved", False):
         logger.debug("Answer already refined, terminating conversation.")
         return Command(goto=END, update={"next": END, "resolved": False})
     
-    # Create the context for the speaker selector agent
     context = f"""
         History: {format_history(state.get("messages", []))}, 
         Question: {state.get("question", "")}, 
         Orchestrator's plan: {state.get("plan", "")}, 
         executed_agents: {state.get("executed_agents", [])}
     """
-    # Select the speaker based on the context
-    speaker = speaker_selector_agent.invoke({"context": context})
+    raw_speaker = speaker_selector_agent.invoke({"context": context})
+    speaker = _parse_speaker(raw_speaker)
+
+    if speaker is None:
+        executed = state.get("executed_agents", [])
+        if "orchestrator" not in executed:
+            speaker = "orchestrator"
+        elif "web_searcher" in executed and "research_analyst" not in executed:
+            speaker = "research_analyst"
+        else:
+            speaker = "answer_refiner"
+        logger.warning(f"Speaker Selector returned invalid speaker '{raw_speaker.strip()}', falling back to: {speaker}")
+
     logger.debug(f"Speaker Selector selected next speaker: {speaker}")
     if speaker == "END":
         speaker = END
@@ -44,9 +63,6 @@ def speaker_selector_node(state: GraphState) -> str:
 
 
 def orchestrator_node(state: GraphState) -> str:
-    """
-    Routes a question to either document retrieval or a direct response to the user.
-    """
     context = f"""
         History: {format_history(state.get("messages", []))}, 
         Question: {state.get("question", "")}
@@ -56,7 +72,6 @@ def orchestrator_node(state: GraphState) -> str:
         logger.debug("Clipping Message History to last 10 messages.")
         messages = messages[-10:]
 
-    # Invoke the orchestrator agent to generate a plan
     plan = orchestrator_agent.invoke({"context": context})
     logger.warning(f"Orchestrator generated Plan: {plan}")
     return {
@@ -66,64 +81,55 @@ def orchestrator_node(state: GraphState) -> str:
     }
 
 
-def sql_node(state: GraphState) -> Dict[str, Any]:
-    """
-    Executes an SQL query to retrieve data based on the question.
-    """
-    
-    # Generate the SQL query using the sql agent
-    query = sql_agent.invoke({
-        "job_posts_df_metadata": job_posts_df_metadata, 
-        "news_df_metadata": news_df_metadata, 
-        "context": state.get("question","")
-    })
-    logger.info(f"Generated SQL query: {query}")
-    
-    # Execute the SQL query and capture the results
-    results = execute_sql_query(query)
-    logger.info(f"SQL query executed. Results: {results}")
+def web_searcher_node(state: GraphState) -> Dict[str, Any]:
+    """Generates a search query and executes it via Tavily."""
+    question = state.get("question", "")
+    plan = state.get("plan", "")
+
+    search_query = web_searcher_agent.invoke({"question": question, "plan": plan})
+    logger.info(f"Web Searcher generated query: {search_query}")
+
+    try:
+        response = tavily_client.search(query=search_query, max_results=5)
+        results = []
+        for r in response.get("results", []):
+            results.append(f"Title: {r['title']}\nURL: {r['url']}\nContent: {r['content']}\n")
+        search_results = "\n---\n".join(results)
+    except Exception as e:
+        logger.error(f"Tavily search failed: {e}")
+        search_results = f"Search failed: {str(e)}"
+
+    logger.info(f"Web Searcher found {len(response.get('results', []))} results")
     return {
-        "executed_agents": state.get("executed_agents", []) + ['sql'],
-        "query_result": results
+        "search_results": search_results,
+        "executed_agents": state.get("executed_agents", []) + ['web_searcher']
     }
 
 
-def visualization_node(state: GraphState) -> Dict[str, Any]:
-    """
-    Generates and runs a visualization script based on the query result.
-    """
-    context = f"""
-        History: {format_history(state.get("messages", []))}, 
-        Question: {state.get("question", "")}, 
-        Multi-Agent framework solution plan: {state.get("plan", "")}, 
-        Query Result: {state.get("query_result", "")}
-    """
-    # Generate the visualization script using the visualization agent
-    response = visualization_agent.invoke({"context": context})
-    script = response.script
-    filename = response.file_name
-    logger.warning(f"Visualization script generated: {script}")
-    logger.warning(f"Visualization script saved to: {filename}")
-    process_and_run_script(script)
-    logger.info("Visualization script executed.")
+def research_analyst_node(state: GraphState) -> Dict[str, Any]:
+    """Analyzes raw search results and produces structured insights."""
+    question = state.get("question", "")
+    search_results = state.get("search_results", "")
+
+    analysis = research_analyst_agent.invoke({
+        "question": question,
+        "search_results": search_results
+    })
+    logger.info(f"Research Analyst produced analysis: {analysis[:200]}...")
+
     return {
-        "visualization_script": script,
-        "generated_file": filename,
-        "executed_agents": state.get("executed_agents", []) + ['visualization']
+        "messages": [AIMessage(content=f"[Research Analysis]\n{analysis}")],
+        "executed_agents": state.get("executed_agents", []) + ['research_analyst']
     }
 
 
 def answer_refiner_node(state: GraphState) -> Dict[str, Any]:
-    """
-    Refines the answer by using the answer refiner agent.
-    """
     context = f"""
         History: {[msg.content for msg in state.get("messages", [])]},
         Question: {state.get("question", "")},
         Multi-Agent framework solution plan: {state.get("plan", "")},
-        Query Result: {state.get("query_result", "")}
+        Search Results: {state.get("search_results", "")}
     """
-    # Refine the answer using the answer refiner agent
     answer = answer_refiner_agent.invoke({"context": context})
     logger.info(f"Refined answer: {answer}")
     return {

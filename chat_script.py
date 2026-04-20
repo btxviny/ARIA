@@ -7,15 +7,15 @@ load_dotenv()
 
 config = {"configurable": {"thread_id": "1"}}
 
-print("""
-   _____ _____                                     _   
-  / ____|_   _|              /\                   | |  
- | |      | |    ______     /  \   __ _  ___ _ __ | |_ 
- | |      | |   |______|   / /\ \ / _` |/ _ \ '_ \| __|
- | |____ _| |_            / ____ \ (_| |  __/ | | | |_ 
-  \_____|_____|          /_/    \_\__, |\___|_| |_|\__|
-                                   __/ |               
-                                  |___/                                                                                                                       
+print(r"""
+  __  __       _ _   _          _                    _   
+ |  \/  |     | | | (_)   /\   | |                  | |  
+ | \  / |_   _| | |_ _   /  \  | | __ _  ___ _ __ | |_ 
+ | |\/| | | | | | __| | / /\ \ | |/ _` |/ _ \ '_ \| __|
+ | |  | | |_| | | |_| |/ ____ \| | (_| |  __/ | | | |_ 
+ |_|  |_|\__,_|_|\__|_/_/    \_\_|\__, |\___|_| |_|\__|
+                                    __/ |               
+                                   |___/                
 """)
 
 def main():
@@ -30,7 +30,7 @@ def main():
             pass
         logger.info(f"Final state: {event}")
         final_answer = event.get("messages",[{}])[-1].content
-        logger.success(f"Final response: {final_answer}python app.py")
+        logger.success(f"Final response: {final_answer}")
 
 if __name__ == "__main__":
     main()
