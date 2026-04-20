@@ -1,0 +1,31 @@
+# Dev overrides. Automatically merged on top of docker-compose.yml by
+# `docker compose up` (no extra flags needed).
+#
+# Effects:
+#   - Bind-mounts the project directory into every Python service so edits
+#     on the host are visible instantly inside the containers.
+#   - Enables uvicorn --reload so the API restarts on code changes.
+#   - Streamlit already hot-reloads on save.
+#   - Celery: no official watch mode, so you'll need to `docker compose
+#     restart worker` after changing agent/graph code. Alternatively, add
+#     `watchmedo` from the `watchdog` package as a wrapper (not included
+#     by default to keep the image slim).
+#
+# To disable overrides and run the "prod-ish" compose only:
+#     docker compose -f docker-compose.yml up
+
+services:
+  api:
+    command: uvicorn src.api:app --host 0.0.0.0 --port 5000 --reload
+    volumes:
+      - ./:/app
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+
+  worker:
+    volumes:
+      - ./:/app
+
+  ui:
+    volumes:
+      - ./:/app

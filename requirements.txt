@@ -1,34 +1,31 @@
+# --- Web framework ----------------------------------------------------------
 fastapi
-celery
-redis
-pandas
-python-dotenv
-openai
-langchain 
-langgraph
-langchainhub
-langchain_unstructured
-langchain-community
-langchain-huggingface
-langchain-openai
-langchain-google-genai
-langchain_chroma
-scikit-learn
-sentence-transformers
-newsapi-python
-trafilatura
-lxml[html_clean]
-jupyter
-ipykernel
-flaml[automl]
-loguru
 uvicorn
-matplotlib
-chromadb
-markdownify
-pypdf
-pyyaml
-python-dotenv
+pydantic
+
+# --- Async task queue -------------------------------------------------------
+celery
+redis                       # celery's Redis transport
+
+# --- UI ---------------------------------------------------------------------
 streamlit
-tavily-1.1.0
-pyppeteer
+requests                    # UI -> API HTTP client
+
+# --- LangChain / LangGraph stack --------------------------------------------
+langchain-core
+langgraph
+langchain-ollama
+langchain-openai
+openai                      # used transitively by langchain-openai
+httpx                       # HTTP client used by OpenAI block in llm.py
+
+# --- Web search & scraping --------------------------------------------------
+tavily-python
+trafilatura
+lxml[html_clean]            # required by trafilatura for HTML cleanup
+urllib3                     # direct SSL context patching in nodes.py
+
+# --- Misc -------------------------------------------------------------------
+python-dotenv
+pyyaml
+loguru

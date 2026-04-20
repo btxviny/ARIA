@@ -15,13 +15,13 @@ This document describes the multi-agent architecture powering this chatbot, buil
    |    +-----+------+   |
    |          |           |
    |    (routes to one)   |
-   |     /    |    \      |
-   |    v     v     v     v
-   | +----+ +----+ +----+ +----+
-   | | OR | | WS | | RA | | AR |
-   | +--+-+ +-+--+ +-+--+ +-+--+
-   |    |     |       |      |
-   +----+-----+-------+------+
+   |    /   /  \   \  \   |
+   |   v   v    v   v   v
+   | +--+ +--+ +--+ +--+ +--+
+   | |OR| |WS| |SC| |RA| |AR|
+   | +-++ +-++ +-++ +-++ +-++
+   |   |    |    |    |    |
+   +---+----+----+----+----+
               |
               v
            +-----+
@@ -29,7 +29,8 @@ This document describes the multi-agent architecture powering this chatbot, buil
            +-----+
 
 OR = Orchestrator
-WS = Web Searcher
+WS = Web Searcher (Tavily snippets)
+SC = Web Scraper (trafilatura full-page extraction)
 RA = Research Analyst
 AR = Answer Refiner
 ```
@@ -45,7 +46,7 @@ All agents route back to the **Supervisor** after execution. The Supervisor deci
 **How it works**:
 - Receives the current state (question, plan, executed agents, history).
 - Calls the LLM to decide which agent should execute next.
-- Validates the LLM output against the set of known agents (`orchestrator`, `web_searcher`, `research_analyst`, `answer_refiner`, `END`).
+- Validates the LLM output against the set of known agents (`orchestrator`, `web_searcher`, `web_scraper`, `research_analyst`, `answer_refiner`, `END`) using a Pydantic `Literal` schema (`with_structured_output`).
 - If the LLM returns an invalid agent name, falls back to a sensible default based on what has already executed.
 - Uses LangGraph's `Command(goto=...)` to route to the selected agent.
 
@@ -96,31 +97,47 @@ All agents route back to the **Supervisor** after execution. The Supervisor deci
 
 ---
 
-### 4. Research Analyst
+### 4. Web Scraper
 
-**Role**: Analyzes and synthesizes raw search results into structured insights.
+**Role**: Fetches and extracts the full text content of specific URLs.
 
 **How it works**:
-- Receives the user's question and raw search results from the Web Searcher.
-- Extracts key facts, dates, numbers, and relevant details.
-- Cross-references information across multiple sources.
-- Produces a structured analysis (with bullet points, sections, etc.).
-- Stores the analysis as an `AIMessage` in the conversation history.
+- Receives the user's question, the orchestrator's plan, conversation history, and (optionally) prior Tavily search results.
+- Uses the LLM (with `with_structured_output(ScrapeTargets)`) to pick 1–3 target URLs. These can be URLs returned by the Web Searcher OR custom URLs constructed by the LLM using well-known patterns (e.g. `https://github.com/<user>?tab=repositories&sort=stargazers`).
+- Fetches each URL with `trafilatura.fetch_url` and extracts the main content with `trafilatura.extract` (plain-text, no boilerplate).
+- Truncates each page to `SCRAPE_MAX_CHARS_PER_URL` (6000 chars) to stay within context limits.
+- Stores the concatenated content in `state.scraped_content` and appends each successfully scraped URL to `state.cited_urls`.
 
-**When it's used**: Always runs after the Web Searcher. Never runs without search results.
+**When it's used**: When the orchestrator's plan names "Web Scraper" — typically for questions that need detailed content living on a specific page (rankings, full article text, repo lists, tables, etc.) that Tavily snippets can't provide.
 
-**Why it exists**: Raw search results are noisy and unstructured. The Research Analyst acts as a filter and organizer, so the Answer Refiner gets clean, vetted information to work with.
+**Dependencies**: `trafilatura`.
 
 ---
 
-### 5. Answer Refiner
+### 5. Research Analyst
+
+**Role**: Analyzes and synthesizes raw material (search snippets AND scraped page content) into structured insights.
+
+**How it works**:
+- Receives the user's question, `search_results` (from Web Searcher), and `scraped_content` (from Web Scraper). Either may be empty; at least one is non-empty when this agent runs.
+- Extracts key facts, dates, numbers, names, rankings, and other details — preserving the source URL next to each fact so the Answer Refiner can cite it.
+- Cross-references information across sources.
+- Produces a structured analysis (bullet points, sections).
+- Stores the analysis as an `AIMessage` in the conversation history.
+
+**When it's used**: Runs after the Web Searcher and/or Web Scraper. Never runs without at least one of them.
+
+---
+
+### 6. Answer Refiner
 
 **Role**: Produces the final user-facing response.
 
 **How it works**:
-- Receives the full context: conversation history, question, plan, and optionally research analysis and search results.
-- Crafts a clear, concise, user-friendly response.
-- Cites sources when the answer is based on web search results.
+- Receives the full context: conversation history, question, plan, research analysis, search results, scraped content, and the `cited_urls` list.
+- Crafts a clear, concise response.
+- **Inline citations**: every claim derived from web sources is cited as `[source](<url>)`, using URLs from `cited_urls`.
+- Appends a `**Sources:**` section listing each cited URL at the bottom of web-sourced answers.
 - Sets the `resolved` flag to `True`, signaling the Supervisor to end the conversation.
 
 **When it's used**: Always the last agent before `END`. Every conversation flow ends with the Answer Refiner.
@@ -155,7 +172,36 @@ Supervisor -> END
 
 Executed agents: `[orchestrator, web_searcher, research_analyst, answer_refiner]`
 
-### Flow 3: Greeting
+### Flow 3: Question Requiring Deep Page Scraping
+
+```
+User: "What is the most starred repo of GitHub user btxviny?"
+
+Supervisor -> Orchestrator (plan: scrape github.com/btxviny?tab=repositories&sort=stargazers, analyze, refine)
+Supervisor -> Web Scraper (LLM picks that URL; trafilatura extracts the repo list)
+Supervisor -> Research Analyst (ranks repos by stars from the scraped page)
+Supervisor -> Answer Refiner (final answer with source citation)
+Supervisor -> END
+```
+
+Executed agents: `[orchestrator, web_scraper, research_analyst, answer_refiner]`
+
+### Flow 4: Search + Scrape
+
+```
+User: "Summarize the main findings of the latest CERN Higgs boson paper."
+
+Supervisor -> Orchestrator (plan: search, then scrape the paper URL, analyze, refine)
+Supervisor -> Web Searcher (finds candidate paper URLs via Tavily)
+Supervisor -> Web Scraper (extracts the full paper text with trafilatura)
+Supervisor -> Research Analyst (synthesizes snippets + full text)
+Supervisor -> Answer Refiner (cites the paper URL)
+Supervisor -> END
+```
+
+Executed agents: `[orchestrator, web_searcher, web_scraper, research_analyst, answer_refiner]`
+
+### Flow 5: Greeting
 
 ```
 User: "Hello!"
@@ -182,6 +228,8 @@ The shared state (`GraphState`) flows through all agents:
 | `question` | `str` | The original user question |
 | `plan` | `str` | The orchestrator's execution plan |
 | `search_results` | `str` | Raw web search results from Tavily |
+| `scraped_content` | `str` | Full-page text extracted by trafilatura, keyed by URL |
+| `cited_urls` | `List[str]` | Deduplicated URLs collected from Web Searcher and Web Scraper, used by the Answer Refiner for inline citations |
 
 ---
 

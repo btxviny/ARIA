@@ -1,23 +1,8 @@
 import streamlit as st
 
 
-def display_title():
-    st.markdown("""
-    <style>
-    .app-title {
-        font-size: 36px;
-        font-weight: bold;
-        text-align: center;
-        margin-bottom: 40px;
-        font-family: 'Helvetica', sans-serif;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
-    }
-    </style>
-    <div class="app-title">Multi-Agent Chatbot</div>
-    """, unsafe_allow_html=True)
-
-
-def sample_questions():
+def sample_questions() -> str | None:
+    """Render the Quick Questions row and return the clicked question (if any)."""
     questions = [
         {"text": "Say Hello", "key": "Hello"},
         {"text": "Explain quantum computing", "key": "Can you explain quantum computing in simple terms?"},
@@ -28,12 +13,10 @@ def sample_questions():
     ]
 
     st.markdown("### Quick Questions")
-    selected_question = None
     cols = st.columns(3)
-
-    for idx, question in enumerate(questions):
+    selected = None
+    for idx, q in enumerate(questions):
         with cols[idx % 3]:
-            if st.button(question["text"]):
-                selected_question = question["key"]
-
-    return selected_question
+            if st.button(q["text"], key=f"qq_{idx}", use_container_width=True):
+                selected = q["key"]
+    return selected
