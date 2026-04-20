@@ -1,49 +1,64 @@
-from dotenv import load_dotenv
-from time import time
-from src.agents.graph import app
-from loguru import logger
+"""Command-line interface for the Multi-Agent Chatbot.
+
+Usage:
+  python chat_script.py                      # interactive mode
+  python chat_script.py "question 1" "q2"    # batch mode (each arg = one turn)
+"""
 import sys
+import uuid
+
+from dotenv import load_dotenv
+from loguru import logger
+
+from src.agents.graph import app
+from src.banner import BANNER
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 load_dotenv()
 
+# One thread_id for the whole CLI session so turns share conversation memory.
+THREAD_ID = str(uuid.uuid4())
+config = {"configurable": {"thread_id": THREAD_ID}}
 
-config = {"configurable": {"thread_id": "1"}}
+print(BANNER)
 
-print(r"""
-  __  __       _ _   _          _                    _   
- |  \/  |     | | | (_)   /\   | |                  | |  
- | \  / |_   _| | |_ _   /  \  | | __ _  ___ _ __ | |_ 
- | |\/| | | | | | __| | / /\ \ | |/ _` |/ _ \ '_ \| __|
- | |  | | |_| | | |_| |/ ____ \| | (_| |  __/ | | | |_ 
- |_|  |_|\__,_|_|\__|_/_/    \_\_|\__, |\___|_| |_|\__|
-                                    __/ |               
-                                   |___/                
-""")
 
-def main():
-    logger.info("System is ready for user queries.")
-    
-    # Check if query was passed as command-line argument
-    if len(sys.argv) > 1:
-        query = " ".join(sys.argv[1:])
-        logger.info(f"Query from command-line argument: {query}")
-        process_query(query)
-    else:
-        # Interactive mode
-        while True:
-            query = input("Your question: ")
-            if query.lower() == 'exit':
-                logger.info("User terminated the session.")
-                break
-            process_query(query)
-
-def process_query(query: str):
+def process_query(query: str) -> None:
     """Process a single query through the agent graph."""
     inputs = {"question": query, "executed_agents": []}
+    event = None
     for event in app.stream(inputs, config, stream_mode="values"):
         pass
-    logger.info(f"Final state: {event}")
-    final_answer = event.get("messages",[{}])[-1].content
+    if event is None:
+        logger.error("Graph produced no output")
+        return
+    logger.info(f"Final state keys: {list(event.keys())}")
+    final_answer = event.get("messages", [{}])[-1].content
     logger.success(f"Final response: {final_answer}")
+
+
+def main() -> None:
+    logger.info(f"System is ready. thread_id={THREAD_ID}")
+
+    if len(sys.argv) > 1:
+        queries = sys.argv[1:]
+        logger.info(f"Running {len(queries)} query(ies) from command-line arguments.")
+        for i, query in enumerate(queries, start=1):
+            logger.info(f"--- Query {i}/{len(queries)}: {query} ---")
+            process_query(query)
+    else:
+        while True:
+            query = input("Your question: ")
+            if query.lower() == "exit":
+                logger.info("User terminated the session.")
+                break
+            if query.strip():
+                process_query(query)
+
 
 if __name__ == "__main__":
     main()

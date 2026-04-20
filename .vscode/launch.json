@@ -9,7 +9,10 @@
             "console": "internalConsole",
             "justMyCode": true,
             "args": [
-                "search the web for Konstantinos Sardelis and tell me about them"
+                "search the web for Konstantinos Sardelis and tell me about them",
+                "has anyone of them written a thesis on a machine learning related subject",
+                "does he have a github account ?",
+                "whats his most starred repo ?"
             ]
         },
         {
