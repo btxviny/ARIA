@@ -30,3 +30,5 @@ pypdf
 pyyaml
 python-dotenv
 streamlit
+tavily-1.1.0
+pyppeteer

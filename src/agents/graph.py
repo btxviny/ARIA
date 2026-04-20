@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 from langgraph.graph import START, END, StateGraph
 from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.runnables.graph_mermaid import MermaidDrawMethod
 
 from src.agents.state import GraphState
 from src.agents.nodes import (
@@ -30,5 +31,3 @@ workflow.add_edge("research_analyst", "supervisor")
 workflow.add_edge("answer_refiner", "supervisor")
 
 app = workflow.compile(checkpointer=memory)
-
-app.get_graph().draw_mermaid_png(output_file_path="graph.png")
