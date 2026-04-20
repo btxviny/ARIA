@@ -1,0 +1,24 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Chat Script with Query",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/chat_script.py",
+            "console": "internalConsole",
+            "justMyCode": true,
+            "args": [
+                "search the web for Konstantinos Sardelis and tell me about them"
+            ]
+        },
+        {
+            "name": "Debug Chat Script (Interactive)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/chat_script.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}
