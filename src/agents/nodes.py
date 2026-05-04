@@ -1,8 +1,7 @@
 import os
 from typing import Any, Dict
 
-import ssl
-import urllib3
+import httpx
 import trafilatura
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.graph import END
@@ -19,39 +18,37 @@ from src.agents.agents import (
     answer_refiner_agent,
 )
 from src.agents.state import GraphState
-from src.agents.utils import format_history
+from src.agents.utils import format_history, init_ssl_context, dedup_urls, normalize_pipeline
 
-# Disable SSL verification for requests
-os.environ['REQUESTS_CA_BUNDLE'] = ''
-os.environ['CURL_CA_BUNDLE'] = ''
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-import urllib3.util.ssl_
-def create_urllib3_context_no_verify(*args, **kwargs):
-    context = urllib3.util.ssl_.create_urllib3_context_original(*args, **kwargs)
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
-    return context
-
-urllib3.util.ssl_.create_urllib3_context_original = urllib3.util.ssl_.create_urllib3_context
-urllib3.util.ssl_.create_urllib3_context = create_urllib3_context_no_verify
+# Initialize SSL context for corporate environments
+init_ssl_context()
 
 tavily_client = TavilyClient(api_key=os.environ.get("TAVILY_API_KEY"))
 
 # Hard cap on scraped characters per URL to keep the context window manageable.
 SCRAPE_MAX_CHARS_PER_URL = 6000
 SCRAPE_MAX_URLS = 3
+NO_SEARCH_RESULTS = "(no search results)"
+NO_SCRAPED_CONTENT = "(no content extracted)"
 
 
-def _dedup(urls):
-    seen = set()
-    out = []
-    for u in urls:
-        if u and u not in seen:
-            seen.add(u)
-            out.append(u)
-    return out
+def _summarize_search_error(error: Exception) -> str:
+    """Collapse noisy provider/network errors into a short operator-facing reason."""
+    message = " ".join(str(error).split())
+    lowered = message.lower()
+
+    if "zscaler" in lowered:
+        return "Tavily web search was blocked by the network proxy (Zscaler)."
+    if "forbidden" in lowered:
+        return "Tavily web search was rejected with a forbidden response."
+    if isinstance(error, httpx.TimeoutException):
+        return "Tavily web search timed out."
+    if isinstance(error, httpx.HTTPError):
+        return "Tavily web search failed because of an HTTP/network error."
+
+    if len(message) > 240:
+        message = message[:237] + "..."
+    return f"Tavily web search failed: {message}"
 
 
 def speaker_selector_node(state: GraphState) -> str:
@@ -93,30 +90,6 @@ def speaker_selector_node(state: GraphState) -> str:
     return Command(goto=speaker, update={"next": speaker})
 
 
-VALID_PIPELINE_AGENTS = {"web_searcher", "web_scraper", "research_analyst", "answer_refiner"}
-
-
-def _normalize_pipeline(pipeline: list[str]) -> list[str]:
-    """Deduplicate, drop invalid entries, enforce invariants: research_analyst
-    whenever search/scrape is present, and answer_refiner always last."""
-    seen = set()
-    out = []
-    for a in pipeline:
-        if a in VALID_PIPELINE_AGENTS and a not in seen:
-            seen.add(a)
-            out.append(a)
-
-    if ("web_searcher" in out or "web_scraper" in out) and "research_analyst" not in out:
-        if "answer_refiner" in out:
-            out.insert(out.index("answer_refiner"), "research_analyst")
-        else:
-            out.append("research_analyst")
-
-    if "answer_refiner" in out:
-        out.remove("answer_refiner")
-    out.append("answer_refiner")
-    return out
-
 
 def orchestrator_node(state: GraphState) -> Dict[str, Any]:
     context = f"""
@@ -138,7 +111,7 @@ def orchestrator_node(state: GraphState) -> Dict[str, Any]:
         pipeline = ["answer_refiner"]
         reasoning = reasoning or "Fallback: orchestrator failed to produce a pipeline."
 
-    pipeline = _normalize_pipeline(pipeline)
+    pipeline = normalize_pipeline(pipeline)
     plan_text = f"{reasoning}\nPipeline: {' -> '.join(pipeline)}"
 
     logger.warning(f"Orchestrator plan: {plan_text}")
@@ -160,20 +133,28 @@ def web_searcher_node(state: GraphState) -> Dict[str, Any]:
 
     results = []
     urls = []
+    search_status = "ok"
+    search_error = ""
     try:
         response = tavily_client.search(query=search_query, max_results=5)
         for r in response.get("results", []):
             results.append(f"Title: {r['title']}\nURL: {r['url']}\nContent: {r['content']}\n")
             urls.append(r['url'])
-        search_results = "\n---\n".join(results)
+        search_results = "\n---\n".join(results) if results else NO_SEARCH_RESULTS
+        if not results:
+            search_status = "empty"
     except Exception as e:
-        logger.error(f"Tavily search failed: {e}")
-        search_results = f"Search failed: {str(e)}"
+        search_status = "failed"
+        search_error = _summarize_search_error(e)
+        logger.error(f"Tavily search failed: {search_error}")
+        search_results = f"(web search unavailable: {search_error})"
 
     logger.info(f"Web Searcher found {len(results)} results")
     return {
         "search_results": search_results,
-        "cited_urls": _dedup(state.get("cited_urls", []) + urls),
+        "search_status": search_status,
+        "search_error": search_error,
+        "cited_urls": dedup_urls(state.get("cited_urls", []) + urls),
         "executed_agents": state.get("executed_agents", []) + ['web_searcher'],
     }
 
@@ -221,11 +202,11 @@ def web_scraper_node(state: GraphState) -> Dict[str, Any]:
         except Exception as e:
             logger.error(f"Web Scraper failed on {url}: {e}")
 
-    scraped_content = "\n---\n".join(scraped_blocks) if scraped_blocks else "(no content extracted)"
+    scraped_content = "\n---\n".join(scraped_blocks) if scraped_blocks else NO_SCRAPED_CONTENT
 
     return {
         "scraped_content": scraped_content,
-        "cited_urls": _dedup(state.get("cited_urls", []) + successful_urls),
+        "cited_urls": dedup_urls(state.get("cited_urls", []) + successful_urls),
         "executed_agents": state.get("executed_agents", []) + ['web_scraper'],
     }
 
@@ -235,12 +216,27 @@ def research_analyst_node(state: GraphState) -> Dict[str, Any]:
     question = state.get("question", "")
     search_results = state.get("search_results", "") or "(none)"
     scraped_content = state.get("scraped_content", "") or "(none)"
+    search_status = state.get("search_status", "")
+    search_error = state.get("search_error", "")
 
-    analysis = research_analyst_agent.invoke({
-        "question": question,
-        "search_results": search_results,
-        "scraped_content": scraped_content,
-    })
+    if search_status == "failed" and scraped_content == NO_SCRAPED_CONTENT:
+        analysis = (
+            "Insufficient source material to answer the question. "
+            f"Live web search is unavailable: {search_error} "
+            "No pages were scraped successfully, so there are no verifiable sources to analyze."
+        )
+    elif search_results == NO_SEARCH_RESULTS and scraped_content == NO_SCRAPED_CONTENT:
+        analysis = (
+            "Insufficient source material to answer the question. "
+            "The web search returned no results and no pages were scraped successfully."
+        )
+    else:
+        analysis = research_analyst_agent.invoke({
+            "question": question,
+            "search_results": search_results,
+            "scraped_content": scraped_content,
+        })
+
     logger.info(f"Research Analyst produced analysis: {analysis[:200]}...")
 
     return {
@@ -255,6 +251,8 @@ def answer_refiner_node(state: GraphState) -> Dict[str, Any]:
         History: {[msg.content for msg in state.get("messages", [])]},
         Question: {state.get("question", "")},
         Multi-Agent framework solution plan: {state.get("plan", "")},
+        Web Search Status: {state.get("search_status", "")},
+        Web Search Error: {state.get("search_error", "")},
         Search Results: {state.get("search_results", "")},
         Scraped Content: {state.get("scraped_content", "")},
         cited_urls: {cited_urls}

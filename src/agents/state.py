@@ -11,5 +11,7 @@ class GraphState(MessagesState):
     plan: str
     pipeline: List[str]
     search_results: str
+    search_status: str
+    search_error: str
     scraped_content: str
     cited_urls: List[str]

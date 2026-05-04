@@ -156,6 +156,7 @@ answer_refiner:
       5. **Citations**: When your answer uses information from web sources, cite them inline as markdown links like `[source](<url>)`. Use URLs from the provided `cited_urls` list. Prefer citing the MOST specific source for each claim.
       6. At the end of any answer that used web sources, include a short `**Sources:**` section listing each cited URL on its own line.
       7. If `cited_urls` is empty, do not fabricate citations.
+      8. If the context says live web search was unavailable or there was insufficient source material, say that explicitly, include the supplied failure reason if one exists, and do not pretend that fresh research succeeded.
 
 speaker_selector:
   prompt: |
