@@ -1,27 +1,39 @@
-import copy
-import json
 from loguru import logger
 
 from src.agents.graph import app as graph
 
+
 class CIAgent:
+    """Thin wrapper around the compiled LangGraph app.
+
+    The LangGraph checkpointer keys conversation memory by `thread_id`, so the
+    caller is responsible for passing a unique id per conversation (e.g. per
+    Streamlit session).
+    """
+
     def __init__(self):
         self.graph = graph
-        self.config = {"configurable": {"thread_id": "1"}}
-    
-    def generate_reply(self, query):
+
+    def generate_reply(self, query: str, thread_id: str = "default") -> dict:
+        config = {"configurable": {"thread_id": thread_id}}
+        inputs = {
+            "question": query,
+            "executed_agents": [],
+            "pipeline": [],
+            "plan": "",
+        }
         try:
-            inputs = {"question": query, "executed_agents": [], "generated_file" : ""}
-            for event in graph.stream(inputs, self.config, stream_mode="values"):
+            event = None
+            for event in self.graph.stream(inputs, config, stream_mode="values"):
                 pass
-            logger.info(f"Final state: {event}")
-            final_answer = event.get("messages",[{}])[-1].content
-            generated_file = event.get("generated_file", "")
-            logger.success(f"Final response: {final_answer}")
-            return {
-                "answer": final_answer, 
-                "generated_file": generated_file, 
-            }
+            if event is None:
+                return {"error": "Graph produced no output"}
+
+            logger.info(f"[thread_id={thread_id}] Final state keys: {list(event.keys())}")
+            messages = event.get("messages", [])
+            final_answer = messages[-1].content if messages else ""
+            logger.success(f"[thread_id={thread_id}] Final response: {final_answer[:200]}...")
+            return {"answer": final_answer}
         except Exception as e:
-            self.code_executor.code_executor.stop()                          
+            logger.exception(f"[thread_id={thread_id}] Error during agent execution")
             return {"error": str(e)}

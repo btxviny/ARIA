@@ -2,18 +2,16 @@ from typing import List, Annotated
 from langgraph.graph import MessagesState
 from langgraph.graph.message import add_messages
 
-class GraphState(MessagesState):  
-    #speaker selector 
+class GraphState(MessagesState):
     next: str
     messages: Annotated[list, add_messages]
     executed_agents: List[str]
     resolved: bool
-    #orchestrator
     question: str
     plan: str
-    #sql
-    query_result: str
-    #visualization
-    visualization_script: str
-    generated_file: str
-   
+    pipeline: List[str]
+    search_results: str
+    search_status: str
+    search_error: str
+    scraped_content: str
+    cited_urls: List[str]

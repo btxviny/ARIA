@@ -1,38 +1,73 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+"""FastAPI layer: accepts chat questions, dispatches them to Celery, and
+exposes endpoints for polling the answer."""
+import sys
+from typing import Optional
+
 from celery.result import AsyncResult
-from src.tasks import process_chat_task, app as celery_app
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
-app = FastAPI()
+from src.banner import BANNER
+from src.tasks import app as celery_app, process_chat_task
 
-print( """
-   _____ _____                 _____ ______ _   _ _______                _____ _____ 
-  / ____|_   _|          /\   / ____|  ____| \ | |__   __|         /\   |  __ \_   _|
- | |      | |    ______ /  \ | |  __| |__  |  \| |  | |______     /  \  | |__) || |  
- | |      | |   |______/ /\ \| | |_ |  __| | . ` |  | |______|   / /\ \ |  ___/ | |  
- | |____ _| |_        / ____ \ |__| | |____| |\  |  | |         / ____ \| |    _| |_ 
-  \_____|_____|      /_/    \_\_____|______|_| \_|  |_|        /_/    \_\_|   |_____|                                                                                                                      
-""")
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 
-# Define the request body model
+app = FastAPI(title="Multi-Agent Chatbot API", version="1.0.0")
+
+print(BANNER)
+
+
 class ChatRequest(BaseModel):
     prompt: str
+    thread_id: Optional[str] = None
 
-@app.post("/question/")
-def question(request: ChatRequest):
-    # Trigger the Celery task with the body data
-    task = process_chat_task.apply_async(args=[request.prompt])
-    return {"task_id": task.id}
 
-@app.get("/answer/{task_id}")
-def answer(task_id: str):
-    # Fetch the result of the task
-    task_state = AsyncResult(task_id, app=celery_app).state
+class ChatResponse(BaseModel):
+    task_id: str
 
-    if task_state == "PENDING":
-        return {"status": "Task is still running"}
-    elif task_state == "SUCCESS":   
-        return {"status": "Completed", "result": AsyncResult(task_id, app=celery_app).get()}
-    else:
-        return {"status": "Failed", "error": AsyncResult(task_id, app=celery_app).get()}
 
+class AnswerResponse(BaseModel):
+    status: str  # "Pending" | "Completed" | "Failed"
+    result: Optional[dict] = None
+    error: Optional[str] = None
+
+
+@app.get("/health")
+def health() -> dict:
+    """Simple liveness check."""
+    return {"status": "ok"}
+
+
+@app.post("/question/", response_model=ChatResponse)
+def question(request: ChatRequest) -> ChatResponse:
+    """Dispatch the question to Celery and return the task id for polling."""
+    if not request.prompt or not request.prompt.strip():
+        raise HTTPException(status_code=400, detail="prompt must not be empty")
+
+    thread_id = request.thread_id or "default"
+    task = process_chat_task.apply_async(args=[request.prompt, thread_id])
+    return ChatResponse(task_id=task.id)
+
+
+@app.get("/answer/{task_id}", response_model=AnswerResponse)
+def answer(task_id: str) -> AnswerResponse:
+    """Poll for the task result. Returns one of Pending / Completed / Failed."""
+    result = AsyncResult(task_id, app=celery_app)
+    state = result.state
+
+    if state in ("PENDING", "STARTED", "RETRY"):
+        return AnswerResponse(status="Pending")
+
+    if state == "SUCCESS":
+        payload = result.result
+        if isinstance(payload, dict) and "error" in payload and "answer" not in payload:
+            # Task completed but the agent itself reported an error.
+            return AnswerResponse(status="Failed", error=str(payload["error"]))
+        return AnswerResponse(status="Completed", result=payload)
+
+    # FAILURE / REVOKED / any unexpected state.
+    error_msg = str(result.result) if result.result else f"Task ended in state {state}"
+    return AnswerResponse(status="Failed", error=error_msg)

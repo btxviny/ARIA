@@ -1,0 +1,92 @@
+# Multi-Agent Chatbot stack.
+#
+# Services:
+#   redis   - broker + result backend for Celery
+#   api     - FastAPI HTTP layer (dispatches tasks, polls results)
+#   worker  - Celery worker that runs the LangGraph agent graph
+#   ui      - Streamlit frontend
+#
+# Ollama is NOT containerized: it runs natively on the host so it can use the
+# GPU. Containers reach it via `host.docker.internal:11434`.
+#
+# Usage:
+#   docker compose up --build           # first run or after dep/code changes
+#   docker compose up -d                # detached
+#   docker compose logs -f worker       # tail a specific service
+#   docker compose up -d --scale worker=4
+#   docker compose down                 # stop, keep Redis data
+#   docker compose down -v              # stop and wipe Redis data
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: .
+    image: multiagent-chatbot:latest
+    command: uvicorn src.api:app --host 0.0.0.0 --port 5000
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      REDIS_URL: redis://redis:6379
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      API_HOST: 0.0.0.0
+      API_PORT: "5000"
+    env_file:
+      - .env
+    extra_hosts:
+      # Required on Linux hosts so host.docker.internal resolves. No-op on
+      # Windows/macOS Docker Desktop where the alias exists by default.
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  worker:
+    build: .
+    image: multiagent-chatbot:latest
+    command: celery -A src.tasks worker --loglevel=INFO --pool=solo -n multiagent@%h
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://redis:6379
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  ui:
+    build: .
+    image: multiagent-chatbot:latest
+    command: streamlit run app.py --server.address=0.0.0.0 --server.port=8501 --server.headless=true
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      API_BASE_URL: http://api:5000
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  redis-data:
