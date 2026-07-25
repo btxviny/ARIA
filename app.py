@@ -11,7 +11,6 @@ from src.config import (
     RESPONSE_TIMEOUT_SECONDS,
 )
 from ui.display_utils.sources import render_sources_sidebar
-from ui.display_utils.utils import sample_questions
 
 
 # --- API client -------------------------------------------------------------
@@ -44,7 +43,6 @@ def _init_session_state() -> None:
         "thread_id": str(uuid.uuid4()),
         "task_id": None,
         "display_history": [],
-        "selected_question": None,
         "waiting_for_response": False,
         "uploaded_signatures": set(),
         "request_started_at": None,
@@ -58,7 +56,6 @@ def _reset_conversation() -> None:
     st.session_state.thread_id = str(uuid.uuid4())
     st.session_state.display_history = []
     st.session_state.task_id = None
-    st.session_state.selected_question = None
     st.session_state.waiting_for_response = False
     st.session_state.request_started_at = None
     # The new thread_id's Chroma collection doesn't exist yet, so sources
@@ -211,23 +208,15 @@ def main() -> None:
 
     _render_banner()
 
-    selected = sample_questions()
-    if selected:
-        st.session_state.selected_question = selected
-
     _render_history()
 
-    user_input = (
-        st.chat_input(
-            "Ask me anything...",
-            disabled=st.session_state.waiting_for_response,
-        )
-        or st.session_state.selected_question
+    user_input = st.chat_input(
+        "Ask me anything...",
+        disabled=st.session_state.waiting_for_response,
     )
 
     if user_input and not st.session_state.waiting_for_response:
         st.session_state.display_history.append({"role": "user", "content": user_input})
-        st.session_state.selected_question = None
         task_id = post_question(user_input, st.session_state.thread_id)
         if task_id:
             st.session_state.task_id = task_id
