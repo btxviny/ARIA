@@ -42,7 +42,13 @@ def process_chat_task(prompt: str, thread_id: str = "default") -> dict:
     """
     try:
         reply = ci_agent.generate_reply(query=prompt, thread_id=thread_id)
-        return {"answer": reply.get("answer", ""), "thread_id": thread_id}
+        return {
+            "answer": reply.get("answer", ""),
+            "thread_id": thread_id,
+            "code_files": reply.get("code_files", []),
+            "code_run_id": reply.get("code_run_id", ""),
+            "code_result": reply.get("code_result", ""),
+        }
     except Exception as e:
         logger.exception(f"process_chat_task failed for thread_id={thread_id}")
         return {"error": str(e), "thread_id": thread_id}

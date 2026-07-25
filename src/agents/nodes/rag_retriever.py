@@ -17,7 +17,7 @@ def rag_retriever_node(state: GraphState, config: RunnableConfig) -> Dict[str, A
     thread_id = config["configurable"]["thread_id"]
     question = state.get("question", "")
     plan = state.get("plan", "")
-    history = format_history(state.get("messages", []))
+    history = format_history(state.get("messages", []), state.get("summary", ""))
 
     try:
         query = rag_retriever_agent.invoke({"question": question, "plan": plan, "history": history})

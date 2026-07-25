@@ -66,6 +66,7 @@ def _reset_conversation() -> None:
     # cache of what to display so it doesn't keep showing the old thread's
     # uploads (same reason display_history is cleared above).
     st.session_state.uploaded_signatures = set()
+    st.session_state.data_files_cache = {}
 
 
 # --- UI ---------------------------------------------------------------------
@@ -97,10 +98,45 @@ def _render_banner() -> None:
     st.code(BANNER, language=None)
 
 
+def _render_code_outputs(code_result: str, code_files: list, code_run_id: str) -> None:
+    """Render code execution output: stdout block + file previews/downloads."""
+    if code_result:
+        with st.expander("Code execution output", expanded=False):
+            st.code(code_result, language=None)
+
+    for file_info in code_files:
+        filename = file_info["filename"]
+        mime_type = file_info.get("mime_type", "application/octet-stream")
+        file_url = f"{API_BASE_URL}/files/{code_run_id}/{filename}"
+        try:
+            resp = requests.get(file_url, timeout=15)
+            resp.raise_for_status()
+            file_bytes = resp.content
+        except requests.RequestException:
+            st.warning(f"Could not load file: {filename}")
+            continue
+
+        if mime_type and mime_type.startswith("image/"):
+            st.image(file_bytes, caption=filename, width=550)
+        else:
+            st.download_button(
+                label=f"Download {filename}",
+                data=file_bytes,
+                file_name=filename,
+                mime=mime_type,
+            )
+
+
 def _render_history() -> None:
     for message in st.session_state.display_history:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
+            if message["role"] == "assistant" and message.get("code_run_id"):
+                _render_code_outputs(
+                    message.get("code_result", ""),
+                    message.get("code_files", []),
+                    message["code_run_id"],
+                )
 
 
 @st.fragment(run_every=RESPONSE_POLL_INTERVAL)
@@ -127,8 +163,15 @@ def _handle_response() -> None:
     status = result.get("status")
 
     if status == "Completed" and result.get("result", {}).get("answer"):
-        answer = result["result"]["answer"]
-        st.session_state.display_history.append({"role": "assistant", "content": answer})
+        payload = result["result"]
+        entry = {
+            "role": "assistant",
+            "content": payload["answer"],
+            "code_files": payload.get("code_files", []),
+            "code_run_id": payload.get("code_run_id", ""),
+            "code_result": payload.get("code_result", ""),
+        }
+        st.session_state.display_history.append(entry)
         st.session_state.task_id = None
         st.session_state.waiting_for_response = False
         st.session_state.request_started_at = None
@@ -140,7 +183,17 @@ def _handle_response() -> None:
         st.session_state.waiting_for_response = False
         st.session_state.request_started_at = None
     else:
-        st.caption(f"Thinking... ({elapsed}s)")
+        st.markdown(
+            """
+            <div class="mac-thinking">
+                <div class="mac-ring"></div>
+                <span class="mac-label">Generating response
+                    <span class="mac-dots"><span>.</span><span>.</span><span>.</span></span>
+                </span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def main() -> None:
