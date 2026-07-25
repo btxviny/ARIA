@@ -10,6 +10,7 @@ from src.config import (
     RESPONSE_POLL_INTERVAL,
     RESPONSE_TIMEOUT_SECONDS,
 )
+from ui.display_utils.sources import render_sources_sidebar
 from ui.display_utils.utils import sample_questions
 
 
@@ -37,12 +38,6 @@ def get_answer(task_id: str) -> dict:
         return {"status": "Failed", "error": str(e)}
 
 
-def stream_answer(answer: str):
-    for word in answer.split(" "):
-        yield word + " "
-        time.sleep(0.02)
-
-
 # --- Session state helpers --------------------------------------------------
 def _init_session_state() -> None:
     defaults = {
@@ -51,6 +46,8 @@ def _init_session_state() -> None:
         "display_history": [],
         "selected_question": None,
         "waiting_for_response": False,
+        "uploaded_signatures": set(),
+        "request_started_at": None,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -63,6 +60,12 @@ def _reset_conversation() -> None:
     st.session_state.task_id = None
     st.session_state.selected_question = None
     st.session_state.waiting_for_response = False
+    st.session_state.request_started_at = None
+    # The new thread_id's Chroma collection doesn't exist yet, so sources
+    # are already gone server-side; this just clears the sidebar's local
+    # cache of what to display so it doesn't keep showing the old thread's
+    # uploads (same reason display_history is cleared above).
+    st.session_state.uploaded_signatures = set()
 
 
 # --- UI ---------------------------------------------------------------------
@@ -77,6 +80,8 @@ def _render_sidebar() -> None:
             _reset_conversation()
             st.rerun()
         st.divider()
+        render_sources_sidebar(st.session_state.thread_id)
+        st.divider()
         with st.expander("API status"):
             try:
                 r = requests.get(f"{API_BASE_URL}/health", timeout=2)
@@ -89,21 +94,7 @@ def _render_sidebar() -> None:
 
 
 def _render_banner() -> None:
-    st.markdown(
-        f"""
-        <pre style="
-            font-family: 'Consolas', 'Courier New', monospace;
-            font-size: 11px;
-            line-height: 1.1;
-            overflow-x: auto;
-            color: #8be9fd;
-            background: transparent;
-            margin: 0 0 16px 0;
-            padding: 0;
-        ">{BANNER}</pre>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.code(BANNER, language=None)
 
 
 def _render_history() -> None:
@@ -112,39 +103,44 @@ def _render_history() -> None:
             st.markdown(message["content"])
 
 
+@st.fragment(run_every=RESPONSE_POLL_INTERVAL)
 def _handle_response() -> None:
-    """Poll the API until the task finishes or times out."""
-    status_placeholder = st.empty()
-    start = time.time()
-    result: dict = {"status": "Pending"}
+    """Poll the API once per fragment tick instead of blocking the whole
+    script (and thus the whole page) for the entire agent turn. Only this
+    fragment reruns every tick -- the sidebar, banner, and history don't."""
+    if not (st.session_state.task_id and st.session_state.waiting_for_response):
+        return
 
-    while time.time() - start < RESPONSE_TIMEOUT_SECONDS:
-        result = get_answer(st.session_state.task_id)
-        status = result.get("status")
-        if status == "Completed":
-            break
-        if status == "Failed":
-            break
-        elapsed = int(time.time() - start)
-        status_placeholder.caption(f"Thinking... ({elapsed}s)")
-        time.sleep(RESPONSE_POLL_INTERVAL)
+    if st.session_state.request_started_at is None:
+        st.session_state.request_started_at = time.time()
+    elapsed = int(time.time() - st.session_state.request_started_at)
 
-    status_placeholder.empty()
+    if elapsed >= RESPONSE_TIMEOUT_SECONDS:
+        st.error("The response generation took too long. Please try again.")
+        st.session_state.task_id = None
+        st.session_state.waiting_for_response = False
+        st.session_state.request_started_at = None
+        st.rerun()
+        return
 
+    result = get_answer(st.session_state.task_id)
     status = result.get("status")
+
     if status == "Completed" and result.get("result", {}).get("answer"):
         answer = result["result"]["answer"]
-        with st.chat_message("assistant"):
-            st.write_stream(stream_answer(answer))
         st.session_state.display_history.append({"role": "assistant", "content": answer})
+        st.session_state.task_id = None
+        st.session_state.waiting_for_response = False
+        st.session_state.request_started_at = None
+        st.rerun()
     elif status == "Failed":
         err = result.get("error", "Unknown error")
         st.error(f"Agent failed: {err}")
+        st.session_state.task_id = None
+        st.session_state.waiting_for_response = False
+        st.session_state.request_started_at = None
     else:
-        st.error("The response generation took too long. Please try again.")
-
-    st.session_state.task_id = None
-    st.session_state.waiting_for_response = False
+        st.caption(f"Thinking... ({elapsed}s)")
 
 
 def main() -> None:
@@ -187,7 +183,6 @@ def main() -> None:
 
     if st.session_state.task_id and st.session_state.waiting_for_response:
         _handle_response()
-        st.rerun()
 
 
 if __name__ == "__main__":

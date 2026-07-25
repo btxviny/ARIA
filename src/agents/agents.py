@@ -1,55 +1,11 @@
 import dotenv
 import yaml
-from typing import List, Literal
-from pydantic import BaseModel, Field
 
 from src.agents.llm import llm
+from src.schemas import NextSpeaker, Pipeline, ScrapeTargets
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 dotenv.load_dotenv()
-
-
-AgentName = Literal[
-    "web_searcher",
-    "web_scraper",
-    "research_analyst",
-    "answer_refiner",
-]
-
-
-class NextSpeaker(BaseModel):
-    """The next agent to run in the multi-agent workflow."""
-    speaker: Literal[
-        "orchestrator",
-        "web_searcher",
-        "web_scraper",
-        "research_analyst",
-        "answer_refiner",
-        "END",
-    ] = Field(description="Name of the next agent to run.")
-
-
-class Pipeline(BaseModel):
-    """Orchestrator's plan, expressed as an ordered list of agents to run."""
-    reasoning: str = Field(
-        description="Brief (1-3 sentences) explanation of why this pipeline was chosen."
-    )
-    pipeline: List[AgentName] = Field(
-        description=(
-            "Ordered list of agents to run, AFTER the orchestrator. "
-            "MUST end with 'answer_refiner'. "
-            "Include 'web_searcher' and/or 'web_scraper' ONLY when real-world "
-            "information is needed. Include 'research_analyst' whenever "
-            "'web_searcher' or 'web_scraper' is in the list."
-        )
-    )
-
-
-class ScrapeTargets(BaseModel):
-    """URLs selected for full-content scraping."""
-    urls: List[str] = Field(
-        description="Fully-qualified http(s) URLs to fetch and scrape. 1-3 URLs."
-    )
 
 
 with open('./prompts/agent_prompts.yaml', 'r') as file:
@@ -84,6 +40,18 @@ web_scraper_prompt = ChatPromptTemplate.from_messages(
     ]
 )
 web_scraper_agent = web_scraper_prompt | llm.with_structured_output(ScrapeTargets)
+#-------------------------------RAG Retriever-----------------------------------------------------]
+rag_retriever_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", prompts["rag_retriever"]["prompt"]),
+        (
+            "human",
+            "Question: {question}\nOrchestrator's Plan: {plan}\n"
+            "Conversation history: {history}",
+        ),
+    ]
+)
+rag_retriever_agent = rag_retriever_prompt | llm | StrOutputParser()
 #-------------------------------Research Analyst--------------------------------------------------]
 research_analyst_prompt = ChatPromptTemplate.from_messages(
     [
@@ -92,7 +60,8 @@ research_analyst_prompt = ChatPromptTemplate.from_messages(
             "human",
             "Question: {question}\n"
             "Search Results:\n{search_results}\n\n"
-            "Scraped Page Content:\n{scraped_content}",
+            "Scraped Page Content:\n{scraped_content}\n\n"
+            "Document Context (from the user's uploaded sources):\n{rag_context}",
         ),
     ]
 )
