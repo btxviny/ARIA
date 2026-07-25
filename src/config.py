@@ -39,6 +39,20 @@ RESPONSE_POLL_INTERVAL: float = float(os.environ.get("RESPONSE_POLL_INTERVAL", "
 SOURCE_INGEST_TIMEOUT_SECONDS: int = int(os.environ.get("SOURCE_INGEST_TIMEOUT_SECONDS", "120"))
 
 
+# --- Conversation history windowing / summarization -------------------------
+# Once the checkpointed message list exceeds this many messages, the oldest
+# ones are folded into a rolling summary and dropped from state.
+HISTORY_SUMMARY_TRIGGER: int = int(os.environ.get("HISTORY_SUMMARY_TRIGGER", "20"))
+# How many of the most recent messages are always kept verbatim (never
+# summarized away). Must be < HISTORY_SUMMARY_TRIGGER.
+HISTORY_WINDOW_SIZE: int = int(os.environ.get("HISTORY_WINDOW_SIZE", "10"))
+
+
+# --- Code executor ----------------------------------------------------------
+CODE_OUTPUTS_DIR: str = os.environ.get("CODE_OUTPUTS_DIR", "./data/code_outputs")
+UPLOADS_DIR: str = os.environ.get("UPLOADS_DIR", "./data/uploads")
+
+
 # --- RAG: personal source upload --------------------------------------------
 # Directory (inside the worker container/host) where the Chroma persistent
 # client stores its per-thread collections. Kept outside /app so the dev

@@ -5,6 +5,7 @@ from langgraph.graph.message import add_messages
 class GraphState(MessagesState):
     next: str
     messages: Annotated[list, add_messages]
+    summary: str
     executed_agents: List[str]
     resolved: bool
     question: str
@@ -17,3 +18,7 @@ class GraphState(MessagesState):
     cited_urls: List[str]
     rag_context: str
     cited_sources: List[str]
+    code_result: str
+    code_files: List[dict]
+    code_run_id: str
+    data_files: List[dict]

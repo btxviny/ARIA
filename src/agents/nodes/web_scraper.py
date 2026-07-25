@@ -18,7 +18,7 @@ def web_scraper_node(state: GraphState) -> Dict[str, Any]:
     question = state.get("question", "")
     plan = state.get("plan", "")
     search_results = state.get("search_results", "") or "(no prior search results)"
-    history = format_history(state.get("messages", []))
+    history = format_history(state.get("messages", []), state.get("summary", ""))
 
     urls: list[str] = []
     try:

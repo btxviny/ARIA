@@ -35,6 +35,16 @@ sentence-transformers       # NOTE: depends on torch -- Dockerfile installs the
                              # CPU-only wheel *before* this file to avoid pulling
                              # the ~4GB CUDA build (no GPU access in the container)
 
+# --- Code executor sandbox libraries ----------------------------------------
+matplotlib
+pandas
+numpy
+reportlab
+fpdf2
+scipy
+pillow
+openpyxl
+
 # --- Misc -------------------------------------------------------------------
 python-dotenv
 pyyaml

@@ -5,13 +5,21 @@ from loguru import logger
 
 from src.agents.agents import answer_refiner_agent
 from src.agents.state import GraphState
+from src.agents.utils import format_history
 
 
 def answer_refiner_node(state: GraphState) -> Dict[str, Any]:
     cited_urls = state.get("cited_urls", [])
     cited_sources = state.get("cited_sources", [])
+    code_result = state.get("code_result", "")
+    code_files = state.get("code_files", [])
+    code_run_id = state.get("code_run_id", "")
+    code_files_summary = (
+        f"Generated files: {[f['filename'] for f in code_files]}" if code_files else ""
+    )
+
     context = f"""
-        History: {[msg.content for msg in state.get("messages", [])]},
+        History: {format_history(state.get("messages", []), state.get("summary", ""))},
         Question: {state.get("question", "")},
         Multi-Agent framework solution plan: {state.get("plan", "")},
         Web Search Status: {state.get("search_status", "")},
@@ -19,6 +27,8 @@ def answer_refiner_node(state: GraphState) -> Dict[str, Any]:
         Search Results: {state.get("search_results", "")},
         Scraped Content: {state.get("scraped_content", "")},
         Document Context: {state.get("rag_context", "")},
+        Code Execution Result: {code_result},
+        {code_files_summary}
         cited_urls: {cited_urls}
         cited_sources: {cited_sources}
     """
