@@ -1,8 +1,12 @@
 import os
 import ssl
+from typing import get_args
+
 import urllib3
 import urllib3.util.ssl_
 from langchain_core.messages import AIMessage, HumanMessage
+
+from src.schemas import AgentName
 
 
 def format_history(messages: list) -> str:
@@ -42,12 +46,12 @@ def dedup_urls(urls: list[str]) -> list[str]:
     return out
 
 
-VALID_PIPELINE_AGENTS = {"web_searcher", "web_scraper", "research_analyst", "answer_refiner"}
+VALID_PIPELINE_AGENTS = set(get_args(AgentName))
 
 
 def normalize_pipeline(pipeline: list[str]) -> list[str]:
     """Deduplicate, validate, and enforce invariants:
-    - research_analyst whenever search/scrape is present
+    - research_analyst whenever search/scrape/rag is present
     - answer_refiner always last
     """
     seen = set()
@@ -56,8 +60,11 @@ def normalize_pipeline(pipeline: list[str]) -> list[str]:
         if a in VALID_PIPELINE_AGENTS and a not in seen:
             seen.add(a)
             out.append(a)
-    
-    if ("web_searcher" in out or "web_scraper" in out) and "research_analyst" not in out:
+
+    if (
+        ("web_searcher" in out or "web_scraper" in out or "rag_retriever" in out)
+        and "research_analyst" not in out
+    ):
         if "answer_refiner" in out:
             out.insert(out.index("answer_refiner"), "research_analyst")
         else:

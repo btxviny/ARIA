@@ -23,7 +23,17 @@ httpx                       # HTTP client used by OpenAI block in llm.py
 tavily-python
 trafilatura
 lxml[html_clean]            # required by trafilatura for HTML cleanup
-urllib3                     # direct SSL context patching in nodes.py
+urllib3                     # direct SSL context patching in agents/utils.py
+
+# --- RAG: personal source upload ---------------------------------------------
+chromadb                    # local vector store (per-thread collections)
+langchain-chroma            # langchain <-> chromadb integration
+langchain-text-splitters    # RecursiveCharacterTextSplitter
+pypdf                       # PDF text extraction
+langchain-huggingface       # local, open-source embeddings (sentence-transformers)
+sentence-transformers       # NOTE: depends on torch -- Dockerfile installs the
+                             # CPU-only wheel *before* this file to avoid pulling
+                             # the ~4GB CUDA build (no GPU access in the container)
 
 # --- Misc -------------------------------------------------------------------
 python-dotenv

@@ -35,3 +35,21 @@ OLLAMA_BASE_URL: str = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434
 RESPONSE_TIMEOUT_SECONDS: int = int(os.environ.get("RESPONSE_TIMEOUT_SECONDS", "180"))
 # Seconds between answer-poll requests from the UI.
 RESPONSE_POLL_INTERVAL: float = float(os.environ.get("RESPONSE_POLL_INTERVAL", "0.5"))
+# Max seconds the UI will wait for a source to finish ingesting.
+SOURCE_INGEST_TIMEOUT_SECONDS: int = int(os.environ.get("SOURCE_INGEST_TIMEOUT_SECONDS", "120"))
+
+
+# --- RAG: personal source upload --------------------------------------------
+# Directory (inside the worker container/host) where the Chroma persistent
+# client stores its per-thread collections. Kept outside /app so the dev
+# compose override's `./:/app` bind mount never shadows it.
+CHROMA_PERSIST_DIR: str = os.environ.get("CHROMA_PERSIST_DIR", "./data/chroma")
+# Chunks retrieved per RAG query.
+RAG_TOP_K: int = int(os.environ.get("RAG_TOP_K", "5"))
+# Hard cap on total chars of retrieved chunk text fed into the research analyst.
+RAG_MAX_CONTEXT_CHARS: int = int(os.environ.get("RAG_MAX_CONTEXT_CHARS", "8000"))
+# Chunking parameters used at ingest time.
+RAG_CHUNK_SIZE: int = int(os.environ.get("RAG_CHUNK_SIZE", "1000"))
+RAG_CHUNK_OVERLAP: int = int(os.environ.get("RAG_CHUNK_OVERLAP", "150"))
+# Max upload size (megabytes), checked against decoded byte length.
+MAX_UPLOAD_MB: int = int(os.environ.get("MAX_UPLOAD_MB", "15"))
