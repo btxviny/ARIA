@@ -19,8 +19,58 @@
 A general-purpose chatbot built on **LangChain + LangGraph**, fronted by
 **FastAPI**, **Celery**, and **Streamlit**. A supervisor-routed agent graph
 searches the web (Tavily), scrapes specific pages (trafilatura), synthesizes
-findings, and answers with cited sources. Runs against a local **Ollama**
-model or any OpenAI-compatible LLM.
+findings, and answers with cited sources. Runs fully **offline** against a
+local **Ollama** or **vLLM** model, or against any OpenAI-compatible API.
+
+![UI screenshot](ui.png)
+
+---
+
+## Capabilities
+
+| Capability | Details |
+|---|---|
+| **Multi-agent reasoning** | A LangGraph supervisor dispatches specialist agents — Orchestrator, Web Searcher, Web Scraper, Research Analyst, Answer Refiner — and routes between them based on what the question needs. |
+| **Web search** | Queries Tavily and returns the top-5 results (title, URL, snippet). Works for current-events questions the LLM's training data can't answer. |
+| **Deep web scraping** | Uses trafilatura to fetch and strip-clean full page text from 1–3 URLs per turn — useful for reading GitHub profiles, papers, documentation, or any public page. |
+| **Cited answers** | Every answer includes inline `[source](url)` links and a `**Sources:**` footer. Citations come only from URLs the agents actually visited — no hallucinated references. |
+| **RAG over personal documents** | Upload PDF, TXT, or Markdown files in the sidebar. They are chunked, embedded, and stored in a per-session Chroma vector store. The agent retrieves relevant passages and cites the filename. |
+| **Code execution** | A coding agent can write and run Python in a sandboxed subprocess, returning stdout and any generated files (images, CSVs, etc.) directly in the chat. |
+| **Multi-turn memory** | Each browser session gets a unique `thread_id`. LangGraph's checkpointer replays the full conversation history on every turn, so follow-up questions work naturally. |
+| **Async task queue** | Questions are dispatched to a Celery worker so the UI never blocks. Multiple users can send questions simultaneously; scale workers with `--scale worker=N`. |
+| **Fully local / offline mode** | Point `LLM_BASE_URL` at a local Ollama or vLLM server and set no cloud API keys — zero data leaves your machine. |
+
+---
+
+## Why self-host?
+
+Most hosted chatbots are black boxes: you send your data to someone else's
+servers, pay per token, and accept their rate limits, content policies, and
+model choices. Self-hosting flips every one of those tradeoffs:
+
+**Privacy** — your prompts, documents, and conversation history never leave
+your infrastructure. This matters for internal knowledge bases, proprietary
+code, legal documents, or any sensitive data.
+
+**Cost** — once you have a GPU (even a consumer RTX card), inference is
+effectively free. No per-token charges, no subscription tiers. A 7B model
+on an RTX 3090 answers questions faster than GPT-4 API latency for a fraction
+of the long-term cost.
+
+**No rate limits** — cloud APIs throttle requests per minute/day. A local
+stack is limited only by your hardware. Batch workloads, automated pipelines,
+and high-frequency use cases all become practical.
+
+**Model choice** — you pick the model. Swap a quantized `llama3.1:8b` for
+`qwen2.5:14b`, a fine-tuned code model, or a domain-specific model — all
+without changing a line of application code, just the `LLM_MODEL` env var.
+
+**Reproducibility** — pin a specific model version and your outputs are
+stable. Cloud providers can change model behaviour under a stable name.
+
+**Open weights = auditability** — with open-source models you can inspect
+weights, training data cards, and alignment approaches. You are not trusting
+a vendor's safety claims.
 
 ---
 
@@ -33,22 +83,19 @@ There are two ways to run it, depending on what you need:
 | [A — Docker](#option-a--docker-recommended) | You just want it running, on Linux/macOS/Windows | The full stack: UI + API + worker + Redis |
 | [B — CLI only](#option-b--cli-only-no-celery-no-ui) | You're debugging the LangGraph agent itself | Just the graph, no web layer |
 
-Both options need at least one LLM backend configured: either a local
-**Ollama** install with a model pulled, or an `OPENAI_API_KEY`. See
-[Switching LLMs](#switching-llms) below. Web search additionally needs a
+Both options need at least one LLM backend configured. See
+[LLM backends](#llm-backends) below. Web search additionally needs a
 [Tavily](https://tavily.com/) API key (`TAVILY_API_KEY`).
 
 ### Option A — Docker (recommended)
 
-Prerequisites: Docker Desktop, plus Ollama running natively on the host
-(pull at least one model, e.g. `ollama pull llama3.1:8b`) — unless you're
-using the OpenAI backend, in which case only `OPENAI_API_KEY` is needed.
+Prerequisites: Docker Desktop, plus your chosen LLM backend running (see
+[LLM backends](#llm-backends)).
 
 ```bash
 # 1. Configure secrets
 cp .env.example .env    # or create .env manually
-# Edit .env and set TAVILY_API_KEY (required for web search) and
-# OPENAI_API_KEY (required unless you switch to the local Ollama LLM).
+# Edit .env — set TAVILY_API_KEY and your LLM backend vars
 
 # 2. Build and launch everything (redis, api, worker, ui)
 docker compose up --build
@@ -58,8 +105,8 @@ docker compose up --build
 ```
 
 That's it — Streamlit is now talking to FastAPI, which dispatches to the
-Celery worker running the LangGraph agent. Ask a question in the chat box
-and watch `docker compose logs -f worker` to see the agents route.
+Celery worker running the LangGraph agent. Watch
+`docker compose logs -f worker` to see the agents route.
 
 Useful commands:
 
@@ -74,8 +121,7 @@ docker compose down -v                                 # stop and wipe data
 ### Option B — CLI only (no Celery, no UI)
 
 Useful for debugging the graph directly, without standing up Redis, FastAPI,
-or Streamlit. Requires Python 3.12 and either a local Ollama install or an
-`OPENAI_API_KEY`.
+or Streamlit. Requires Python 3.12 and a configured LLM backend.
 
 ```bash
 python -m venv venv
@@ -90,7 +136,7 @@ python chat_script.py "question 1" "question 2"    # batch mode
 
 ## Required environment variables
 
-Set in `.env` (see [§4.4](#44-central-configuration-srcconfigpy) below for the full list):
+Set in `.env` (see [§4.4](#44-central-configuration-srcconfigpy) for the full list):
 
 ```
 TAVILY_API_KEY=tvly-...      # required for web search
@@ -99,23 +145,89 @@ OPENAI_API_KEY=sk-...        # required when using ChatOpenAI (the current defau
 
 ---
 
-## Switching LLMs
+## LLM backends
 
-Edit `src/agents/llm.py` and (un)comment the desired block:
+The application is backend-agnostic. Edit `src/agents/llm.py` to select one.
+Embeddings follow the same toggle pattern in `src/rag/embeddings.py` — keep
+it in sync with `llm.py` when switching providers.
 
-- **Local Ollama**: `ChatOllama(model="llama3.1:8b")`. Pull the model first:
-  `ollama pull llama3.1:8b`. For noticeably better routing and
-  structured-output compliance on small models, try `qwen2.5:7b`.
-- **OpenAI** (current default): `ChatOpenAI(model="gpt-4o-mini")`. Requires
-  `OPENAI_API_KEY`.
+### Ollama (local, recommended for getting started)
 
-The `OLLAMA_BASE_URL` env var is honored automatically, so the same code runs
-on the host (`http://localhost:11434`) and in Docker
-(`http://host.docker.internal:11434`).
+Ollama is the easiest way to run open-weight models locally. It manages model
+downloads, quantisation, and GPU offloading automatically.
 
-Embeddings follow the same toggle pattern in `src/rag/embeddings.py`
-(Ollama `nomic-embed-text` vs. OpenAI `text-embedding-3-small`) — keep it in
-sync with `llm.py` when switching providers.
+```bash
+# Install: https://ollama.com
+ollama pull llama3.1:8b       # fast, good general performance
+ollama pull qwen2.5:7b        # better structured-output compliance for routing
+ollama pull nomic-embed-text  # required for local embeddings
+```
+
+In `src/agents/llm.py`, uncomment:
+
+```python
+from langchain_ollama import ChatOllama
+llm = ChatOllama(model="llama3.1:8b")
+```
+
+`OLLAMA_BASE_URL` defaults to `http://localhost:11434` on the host and
+`http://host.docker.internal:11434` inside Docker — no extra config needed.
+
+**Model recommendations:**
+
+| Model | Size | Good for |
+|---|---|---|
+| `qwen2.5:7b` | ~5 GB | Best routing + structured output on small hardware |
+| `llama3.1:8b` | ~5 GB | Strong general reasoning |
+| `gemma3:12b` | ~8 GB | Good balance of speed and quality |
+| `mistral:7b` | ~4 GB | Fast, good for simple Q&A |
+| `deepseek-coder-v2:16b` | ~9 GB | Best for the coding agent |
+
+### vLLM (local, high-throughput production serving)
+
+[vLLM](https://github.com/vllm-project/vllm) exposes an OpenAI-compatible
+API and is significantly faster than Ollama at high concurrency thanks to
+PagedAttention. Use it when you need to serve multiple users or run batch
+workloads.
+
+```bash
+pip install vllm
+python -m vllm.entrypoints.openai.api_server \
+    --model meta-llama/Meta-Llama-3.1-8B-Instruct \
+    --port 8000
+```
+
+Then in `src/agents/llm.py`:
+
+```python
+from langchain_openai import ChatOpenAI
+llm = ChatOpenAI(
+    model="meta-llama/Meta-Llama-3.1-8B-Instruct",
+    base_url="http://localhost:8000/v1",
+    api_key="not-needed",         # vLLM does not require a real key
+)
+```
+
+Set `LLM_BASE_URL=http://localhost:8000/v1` (or the Docker equivalent) and
+the rest of the stack works unchanged.
+
+### Any OpenAI-compatible endpoint
+
+The pattern above works for any server that speaks the OpenAI chat-completion
+API: [LM Studio](https://lmstudio.ai/), [llama.cpp server](https://github.com/ggerganov/llama.cpp),
+[Jan](https://jan.ai/), [LocalAI](https://localai.io/), and others. Point
+`base_url` at their endpoint and set a dummy `api_key`.
+
+### OpenAI (cloud, current default)
+
+```python
+from langchain_openai import ChatOpenAI
+llm = ChatOpenAI(model="gpt-4o-mini")   # requires OPENAI_API_KEY
+```
+
+`gpt-4o-mini` is the default because it gives reliable structured-output
+compliance (critical for the supervisor) at low cost. Swap to `gpt-4o` for
+higher-quality reasoning.
 
 ---
 
@@ -131,10 +243,11 @@ everything together.
                      ┌──────────────────────────────────────────┐
                      │              host machine                │
                      │                                          │
-                     │   Ollama (native, GPU-accelerated)       │
-                     │     :11434                               │
+                     │   Ollama / vLLM (native, GPU-accel.)    │
+                     │     :11434 / :8000                       │
                      │         ▲                                │
-                     │         │ http (langchain_ollama)        │
+                     │         │ http (langchain_ollama /       │
+                     │         │       langchain_openai)        │
                      │         │                                │
                      │  ┌──────┴───── docker compose ────────┐  │
    browser ──────────┼─►│  ui (Streamlit)  :8501             │  │
@@ -154,7 +267,7 @@ everything together.
                      │  │       │                            │  │
                      │  │       ├── Tavily API (web search)  │  │
                      │  │       ├── trafilatura (scraping)   │──┼──► internet
-                     │  │       └── Ollama (LLM inference) ──┼──┘
+                     │  │       └── LLM backend (inference) ─┼──┘
                      │  └────────────────────────────────────┘  │
                      └──────────────────────────────────────────┘
 ```
@@ -349,12 +462,11 @@ Why Celery and not just running the graph inline in FastAPI?
 
 #### 4.3 Streamlit (`app.py`)
 
-- Renders the banner, chat history, sample questions, sidebar (session UUID,
-  API health, new-chat button).
+- Renders the banner, chat history, and sidebar (session UUID, API health,
+  new-chat button, document upload).
 - Generates a `thread_id` per browser session (`uuid.uuid4()`).
 - Calls `POST /question/`, then polls `GET /answer/{task_id}` every
   `RESPONSE_POLL_INTERVAL` seconds up to `RESPONSE_TIMEOUT_SECONDS`.
-- Streams the answer word-by-word via `st.write_stream`.
 
 #### 4.4 Central configuration (`src/config.py`)
 
@@ -417,7 +529,8 @@ Running Ollama inside a container on Windows requires the NVIDIA Container
 Toolkit + WSL GPU passthrough configuration, which is brittle and you'd lose
 the integration with Ollama's native update/model-management tooling. The
 speedup from GPU-native Ollama is so large that it almost always dominates
-any container-orchestration upside.
+any container-orchestration upside. vLLM users on Linux can run it in a
+container with `--gpus all` if preferred.
 
 #### 5.4 Health checks & startup order
 
@@ -504,14 +617,119 @@ A single user turn, traced through every component:
    Celery stores in the Redis result backend under the task id.
 8. **FastAPI `/answer/{task_id}`** — next poll sees `SUCCESS`, returns
    `{"status": "Completed", "result": {...}}`.
-9. **Streamlit** — streams the answer word-by-word into the chat, appends to
+9. **Streamlit** — renders the answer into the chat, appends to
    `display_history`.
 
 All LLM calls in step 6 go to the configured LLM backend — natively on the
-host via `http://host.docker.internal:11434` for Ollama, or to the OpenAI API
-when `ChatOpenAI` is active.
+host via `http://host.docker.internal:11434` for Ollama/vLLM, or to the
+OpenAI API when `ChatOpenAI` is active.
 
-### 7. Extension points
+---
+
+## Roadmap
+
+These are the most impactful improvements that would make this production-ready
+for a team or a public deployment. None require architectural changes — they
+are straightforward extensions of what is already here.
+
+### Persistent session history
+
+**Current state:** LangGraph uses `MemorySaver`, which stores conversation
+state in the worker's RAM. Restarting the worker or scaling to multiple workers
+loses all history.
+
+**Fix:** Swap in `RedisSaver` from `langgraph-checkpoint-redis`. Each turn's
+state is serialized to Redis under the `thread_id` key, so any worker can
+pick up any thread and history survives restarts.
+
+```python
+# src/agents/graph.py
+from langgraph.checkpoint.redis import RedisSaver
+checkpointer = RedisSaver.from_conn_string(REDIS_URL)
+```
+
+This also enables **conversation export** (dump a thread's Redis keys) and
+**conversation replay** (re-run a turn with different parameters).
+
+### Multi-user support and authentication
+
+**Current state:** the app is single-user by design — no login, no access
+control. Anyone who can reach port 8501 can use it.
+
+**What's needed for a team deployment:**
+
+- **Authentication** — add an auth middleware to FastAPI (e.g. OAuth2 with
+  JWT, or a simple API-key header). Streamlit can gate the UI with
+  `st.login()` (available in Streamlit ≥ 1.37) or a reverse proxy like
+  Nginx + basic auth.
+- **Per-user namespacing** — replace the random `thread_id` with
+  `{user_id}:{thread_id}` so users can't read each other's history. Chroma
+  collections are already namespaced by `thread_id`; extend that to
+  `{user_id}/{thread_id}`.
+- **Session list** — store a `{user_id} → [thread_ids]` mapping in Redis or
+  a lightweight SQL DB so users can resume past conversations from a sidebar
+  dropdown.
+
+### vLLM for production serving
+
+**Current state:** Ollama is great for development but is single-threaded per
+model: it queues requests rather than batching them. Under concurrent load
+response times degrade linearly.
+
+**vLLM** implements PagedAttention and continuous batching, achieving 10–20×
+higher throughput on the same hardware for concurrent users. Switching is
+one config change (see [LLM backends](#llm-backends) above). Recommended for
+any deployment with more than 2–3 simultaneous users.
+
+Additional vLLM capabilities worth enabling:
+
+- **Speculative decoding** (`--speculative-model`) — 2–3× faster output on
+  large models with a small draft model.
+- **LoRA adapters** (`--lora-modules`) — serve domain-specific fine-tuned
+  adapters alongside the base model without separate deployments.
+- **Quantization** (`--quantization awq`) — run 70B models on 2×24 GB GPUs.
+
+### Additional self-hosted model backends
+
+| Backend | Best for |
+|---|---|
+| [llama.cpp server](https://github.com/ggerganov/llama.cpp) | CPU-only or mixed CPU+GPU inference; very low memory overhead |
+| [LM Studio](https://lmstudio.ai/) | Local dev on Mac/Windows with a GUI model manager |
+| [LocalAI](https://localai.io/) | Drop-in OpenAI replacement with Stable Diffusion, Whisper, and TTS built in |
+| [Jan](https://jan.ai/) | Desktop app with an embedded OpenAI-compatible server |
+| [Xinference](https://github.com/xorbitsai/inference) | Kubernetes-friendly multi-model serving with a model hub |
+
+All expose an OpenAI-compatible `/v1/chat/completions` endpoint; switching
+is a `base_url` change in `src/agents/llm.py`.
+
+### Streaming responses
+
+**Current state:** the UI polls for a completed answer and renders it all at
+once. For long answers this means a blank screen for 10–30 seconds.
+
+**Fix:** use LangGraph's streaming mode and Server-Sent Events (SSE) from
+FastAPI. The Streamlit fragment that polls `/answer/{task_id}` becomes a
+loop over an SSE stream, appending tokens as they arrive. The perceived
+latency drops to the time-to-first-token (~1–2 s) instead of the full
+generation time.
+
+### Tool expansion
+
+The supervisor graph is designed to be extended. High-value additions:
+
+- **SQL / database agent** — give the agent read access to a PostgreSQL or
+  SQLite database; useful for internal analytics questions.
+- **Vector store search** — a dedicated RAG node that queries a persistent
+  Chroma or Qdrant collection (separate from the per-session upload store)
+  for a shared knowledge base across all users.
+- **Calendar / email tools** — integrate with Google Calendar or Outlook via
+  their APIs for scheduling and notification use cases.
+- **Image generation** — route image-generation requests to a local Stable
+  Diffusion server (e.g. via ComfyUI's API).
+
+---
+
+## Extension points
 
 | Goal | How |
 |---|---|
@@ -521,7 +739,9 @@ when `ChatOpenAI` is active.
 | Observability | Add `flower` to compose (`docker compose up -d flower`) for a Celery dashboard, or wire OpenTelemetry into FastAPI + LangChain. |
 | Deploy to a cloud | The compose file runs on any Docker host. Move Ollama into a GPU-enabled container or switch the LLM to a cloud provider via `src/agents/llm.py`. |
 
-### 8. File map
+---
+
+## File map
 
 ```
 .
@@ -548,7 +768,7 @@ when `ChatOpenAI` is active.
 │   │   ├── ingest.py                # parsing + chunking for uploaded PDF/TXT/MD
 │   │   └── vectorstore.py           # per-thread Chroma collections
 │   └── agents/
-│       ├── llm.py                   # ChatOllama / ChatOpenAI selector
+│       ├── llm.py                   # ChatOllama / ChatOpenAI / vLLM selector
 │       ├── state.py                 # GraphState TypedDict
 │       ├── agents.py                # LangChain runnables per agent
 │       ├── nodes/                   # one graph node per file (including tool calls)
@@ -558,6 +778,6 @@ when `ChatOpenAI` is active.
 └── ui/
     ├── style.css
     └── display_utils/
-        ├── utils.py                 # sample questions
+        ├── utils.py                 # UI display helpers
         └── sources.py               # sidebar: upload/list/delete personal sources
 ```
