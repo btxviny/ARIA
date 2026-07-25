@@ -21,6 +21,10 @@ class CIAgent:
             "executed_agents": [],
             "pipeline": [],
             "plan": "",
+            "code_run_id": "",
+            "code_files": [],
+            "code_result": "",
+            "data_files": [],
         }
         try:
             event = None
@@ -33,7 +37,12 @@ class CIAgent:
             messages = event.get("messages", [])
             final_answer = messages[-1].content if messages else ""
             logger.success(f"[thread_id={thread_id}] Final response: {final_answer[:200]}...")
-            return {"answer": final_answer}
+            return {
+                "answer": final_answer,
+                "code_files": event.get("code_files", []),
+                "code_run_id": event.get("code_run_id", ""),
+                "code_result": event.get("code_result", ""),
+            }
         except Exception as e:
             logger.exception(f"[thread_id={thread_id}] Error during agent execution")
             return {"error": str(e)}

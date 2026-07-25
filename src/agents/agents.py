@@ -2,7 +2,7 @@ import dotenv
 import yaml
 
 from src.agents.llm import llm
-from src.schemas import NextSpeaker, Pipeline, ScrapeTargets
+from src.schemas import CodeGenOutput, NextSpeaker, Pipeline, ScrapeTargets
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 dotenv.load_dotenv()
@@ -19,6 +19,18 @@ orchestrator_prompt = ChatPromptTemplate.from_messages(
     ]
 )
 orchestrator_agent = orchestrator_prompt | llm.with_structured_output(Pipeline)
+#-------------------------------History Summarizer------------------------------------------------]
+history_summarizer_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", prompts["history_summarizer"]["prompt"]),
+        (
+            "human",
+            "Previous summary (may be empty):\n{summary}\n\n"
+            "New conversation turns to incorporate:\n{new_lines}",
+        ),
+    ]
+)
+history_summarizer_agent = history_summarizer_prompt | llm | StrOutputParser()
 #-------------------------------Web Searcher------------------------------------------------------]
 web_searcher_prompt = ChatPromptTemplate.from_messages(
     [
@@ -74,6 +86,20 @@ answer_refiner_prompt = ChatPromptTemplate.from_messages(
     ]
 )
 answer_refiner_agent = answer_refiner_prompt | llm | StrOutputParser()
+#-------------------------------Code Executor---------------------------------------------------]
+code_executor_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", prompts["code_executor"]["prompt"]),
+        (
+            "human",
+            "Question: {question}\nOrchestrator's Plan: {plan}\n"
+            "Search Results (if any):\n{search_results}\n"
+            "Document Context (if any):\n{rag_context}\n"
+            "Uploaded data files available (filename -> full path):\n{data_files}",
+        ),
+    ]
+)
+code_executor_agent = code_executor_prompt | llm.with_structured_output(CodeGenOutput)
 #-------------------------------Speaker Selector------------------------------------------------
 speaker_selector_prompt = ChatPromptTemplate.from_messages(
     [

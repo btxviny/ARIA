@@ -1,13 +1,225 @@
+/* ============================================================
+   Multi-Agent Chatbot -- "terminal" theme
+   A dark, monospace-accented look that plays off the ASCII banner:
+   deep space background, neon violet/cyan accents, glowing edges.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+    --mac-bg: #0b0b14;
+    --mac-bg-alt: #12121f;
+    --mac-panel: #15152680;
+    --mac-border: #2a2a45;
+    --mac-violet: #a259ff;
+    --mac-violet-soft: rgba(162, 89, 255, 0.35);
+    --mac-cyan: #47e0d1;
+    --mac-text: #e7e6f5;
+    --mac-text-dim: #9490b3;
+}
+
+/* ---- Global surface ------------------------------------------------- */
+html, body,
+.stApp,
+[data-testid="stAppViewContainer"],
+[data-testid="stMainBlockContainer"],
+[data-testid="stBottom"],
+[data-testid="stBottomBlockContainer"],
+[data-testid="stHeader"] {
+    background: transparent !important;
+}
+
+.stApp {
+    background:
+        radial-gradient(ellipse 900px 500px at 15% -10%, rgba(162, 89, 255, 0.16), transparent 60%),
+        radial-gradient(ellipse 800px 500px at 110% 10%, rgba(71, 224, 209, 0.10), transparent 55%),
+        var(--mac-bg) !important;
+    color: var(--mac-text);
+    font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', sans-serif !important;
+    letter-spacing: 0.02em;
+}
+
+p, span, div, label {
+    font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+}
+
+::selection {
+    background: var(--mac-violet-soft);
+}
+
+/* ---- Scrollbar -------------------------------------------------------- */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--mac-violet), var(--mac-cyan));
+    border-radius: 8px;
+}
+
+/* ---- Sidebar ------------------------------------------------------------ */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, var(--mac-bg-alt), var(--mac-bg));
+    border-right: 1px solid var(--mac-border);
+}
+
+[data-testid="stSidebar"] h1 {
+    background: linear-gradient(90deg, var(--mac-violet), var(--mac-cyan));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 700 !important;
+}
+
+[data-testid="stSidebar"] hr {
+    border-color: var(--mac-border) !important;
+}
+
+/* ---- Banner (ASCII art) ------------------------------------------------- */
+[data-testid="stCode"] {
+    background: var(--mac-panel) !important;
+    border: 1px solid var(--mac-border);
+    border-radius: 10px;
+    box-shadow: 0 0 30px -12px var(--mac-violet-soft);
+}
+
+[data-testid="stCode"] pre,
+[data-testid="stCode"] code,
+[data-testid="stCode"] span {
+    font-family: 'JetBrains Mono', monospace !important;
+    color: var(--mac-cyan) !important;
+    text-shadow: 0 0 12px rgba(71, 224, 209, 0.35);
+    background: transparent !important;
+}
+
+/* ---- Buttons -------------------------------------------------------- */
 button {
-    background-color: rgb(103, 54, 128) !important;
-    color: rgb(255, 255, 255) !important;
-    border: none;
-    border-radius: 5px;
+    background: linear-gradient(135deg, var(--mac-violet), #6b2fd6) !important;
+    color: #fff !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 10px;
     padding: 10px 20px;
     text-align: center;
-    font-size: 16px;
-    font-weight: bold;
-    width: 100%;  
-    display: block;    
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    width: 100%;
+    display: block;
     cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.2s ease;
+    box-shadow: 0 2px 14px -4px var(--mac-violet-soft);
+}
+
+button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 22px -4px var(--mac-violet-soft), 0 0 0 1px var(--mac-cyan) inset;
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+/* ---- Chat input ------------------------------------------------------ */
+[data-testid="stChatInput"] {
+    background: var(--mac-panel);
+    border: 1px solid var(--mac-border) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.5);
+}
+
+[data-testid="stChatInput"]:focus-within {
+    border-color: var(--mac-violet) !important;
+    box-shadow: 0 0 0 3px var(--mac-violet-soft);
+}
+
+[data-testid="stChatInput"] textarea {
+    color: var(--mac-text) !important;
+    font-family: 'Space Grotesk', sans-serif;
+}
+
+/* ---- Chat messages ---------------------------------------------------- */
+[data-testid="stChatMessage"] {
+    border-radius: 16px;
+    border: 1px solid var(--mac-border);
+    background: var(--mac-panel);
+    padding: 4px 6px;
+    margin-bottom: 10px;
+    backdrop-filter: blur(6px);
+}
+
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
+    border-color: var(--mac-violet-soft);
+    background: linear-gradient(135deg, rgba(162, 89, 255, 0.10), rgba(162, 89, 255, 0.02));
+}
+
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) {
+    border-color: rgba(71, 224, 209, 0.25);
+    background: linear-gradient(135deg, rgba(71, 224, 209, 0.08), rgba(71, 224, 209, 0.02));
+}
+
+[data-testid="stChatMessageAvatarUser"] {
+    background: linear-gradient(135deg, var(--mac-violet), #6b2fd6) !important;
+}
+
+[data-testid="stChatMessageAvatarAssistant"] {
+    background: linear-gradient(135deg, var(--mac-cyan), #1d8f85) !important;
+}
+
+/* ---- "Thinking" spinner ----------------------------------------------- */
+.mac-thinking {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 2px 2px 4px;
+}
+
+.mac-thinking .mac-ring {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2.5px solid rgba(162, 89, 255, 0.18);
+    border-top-color: var(--mac-violet);
+    border-right-color: var(--mac-cyan);
+    animation: mac-spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
+.mac-thinking .mac-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--mac-text-dim);
+    letter-spacing: 0.02em;
+}
+
+.mac-thinking .mac-dots span {
+    animation: mac-blink 1.4s infinite;
+    animation-fill-mode: both;
+}
+.mac-thinking .mac-dots span:nth-child(2) { animation-delay: 0.2s; }
+.mac-thinking .mac-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes mac-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes mac-blink {
+    0%, 80%, 100% { opacity: 0.2; }
+    40% { opacity: 1; }
+}
+
+/* ---- Misc: captions, expanders, dividers ------------------------------- */
+[data-testid="stCaptionContainer"], small {
+    color: var(--mac-text-dim) !important;
+}
+
+[data-testid="stExpander"] {
+    border: 1px solid var(--mac-border) !important;
+    border-radius: 10px !important;
+    background: var(--mac-panel);
+}
+
+hr {
+    border-color: var(--mac-border) !important;
 }

@@ -9,7 +9,7 @@ import sys
 from fastapi import FastAPI
 
 from src.banner import BANNER
-from src.routers import chat, sources
+from src.routers import chat, datafiles, files, sources
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -22,6 +22,8 @@ print(BANNER)
 
 app.include_router(chat.router)
 app.include_router(sources.router)
+app.include_router(files.router)
+app.include_router(datafiles.router)
 
 
 @app.get("/health")
