@@ -19,6 +19,7 @@ AgentName = Literal[
     "rag_retriever",
     "research_analyst",
     "answer_refiner",
+    "code_executor",
 ]
 
 
@@ -31,8 +32,15 @@ class NextSpeaker(BaseModel):
         "rag_retriever",
         "research_analyst",
         "answer_refiner",
+        "code_executor",
         "END",
     ] = Field(description="Name of the next agent to run.")
+
+
+class CodeGenOutput(BaseModel):
+    """Code generation output from the code executor agent."""
+    description: str = Field(description="Brief description of what the code does.")
+    code: str = Field(description="Complete, self-contained Python code to execute.")
 
 
 class Pipeline(BaseModel):
@@ -111,4 +119,22 @@ class SourceListResponse(BaseModel):
 
 
 class DeleteSourceResponse(BaseModel):
+    deleted: bool
+
+
+class DataFileUploadRequest(BaseModel):
+    thread_id: str
+    files: List[SourceFilePayload]
+
+
+class DataFileInfo(BaseModel):
+    filename: str
+    size_bytes: int
+
+
+class DataFilesListResponse(BaseModel):
+    files: List[DataFileInfo]
+
+
+class DeleteDataFileResponse(BaseModel):
     deleted: bool

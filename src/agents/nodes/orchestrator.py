@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any, Dict
 
 from langchain_core.messages import HumanMessage
@@ -7,7 +8,21 @@ from loguru import logger
 from src.agents.agents import orchestrator_agent
 from src.agents.state import GraphState
 from src.agents.utils import format_history, normalize_pipeline
+from src.config import UPLOADS_DIR
 from src.rag import vectorstore
+
+_ACCEPTED_DATA_EXTS = {".xlsx", ".xls", ".csv", ".json", ".parquet", ".tsv"}
+
+
+def _list_data_files(thread_id: str) -> list[dict]:
+    thread_dir = Path(UPLOADS_DIR) / thread_id
+    if not thread_dir.exists():
+        return []
+    return [
+        {"filename": f.name, "path": str(f)}
+        for f in sorted(thread_dir.iterdir())
+        if f.is_file() and f.suffix.lower() in _ACCEPTED_DATA_EXTS
+    ]
 
 
 def orchestrator_node(state: GraphState, config: RunnableConfig) -> Dict[str, Any]:
@@ -20,11 +35,17 @@ def orchestrator_node(state: GraphState, config: RunnableConfig) -> Dict[str, An
     sources_available = len(sources) > 0
     filenames = [s["filename"] for s in sources]
 
+    data_files = _list_data_files(thread_id)
+    data_files_available = len(data_files) > 0
+    data_file_names = [f["filename"] for f in data_files]
+
     context = f"""
-        History: {format_history(state.get("messages", []))},
+        History: {format_history(state.get("messages", []), state.get("summary", ""))},
         Question: {state.get("question", "")}
         Sources available: {sources_available}
         Uploaded source filenames: {filenames}
+        Data files available for code analysis: {data_files_available}
+        Uploaded data file names: {data_file_names}
     """
 
     pipeline: list[str] = []
@@ -49,5 +70,6 @@ def orchestrator_node(state: GraphState, config: RunnableConfig) -> Dict[str, An
         "messages": [HumanMessage(content=state.get("question", ""))],
         "plan": plan_text,
         "pipeline": pipeline,
+        "data_files": data_files,
         "executed_agents": state.get("executed_agents", []) + ['orchestrator'],
     }

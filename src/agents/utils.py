@@ -9,8 +9,10 @@ from langchain_core.messages import AIMessage, HumanMessage
 from src.schemas import AgentName
 
 
-def format_history(messages: list) -> str:
+def format_history(messages: list, summary: str = "") -> str:
     formated_history = []
+    if summary:
+        formated_history.append(f"[Summary of earlier conversation]\n{summary}")
     for message in messages:
         if isinstance(message, HumanMessage):
             formated_history.append(f"User: {message.content}")
@@ -64,6 +66,7 @@ def normalize_pipeline(pipeline: list[str]) -> list[str]:
     if (
         ("web_searcher" in out or "web_scraper" in out or "rag_retriever" in out)
         and "research_analyst" not in out
+        and "code_executor" not in out
     ):
         if "answer_refiner" in out:
             out.insert(out.index("answer_refiner"), "research_analyst")
