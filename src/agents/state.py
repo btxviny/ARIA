@@ -15,3 +15,5 @@ class GraphState(MessagesState):
     search_error: str
     scraped_content: str
     cited_urls: List[str]
+    rag_context: str
+    cited_sources: List[str]

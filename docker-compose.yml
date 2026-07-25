@@ -16,13 +16,24 @@
 #   docker compose up -d --scale worker=4
 #   docker compose down                 # stop, keep Redis data
 #   docker compose down -v              # stop and wipe Redis data
+#
+# RAG source uploads (chroma-data volume, worker only): Chroma's
+# PersistentClient is a single-writer, SQLite-backed embedded store, so
+# `--scale worker=4` above is NOT safe to use once source uploads are in use
+# -- multiple worker processes must not open the same Chroma persist dir
+# concurrently. Keep worker at 1 replica, or swap to a Chroma server
+# container + HttpClient before scaling workers horizontally.
 
 services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      # Host-side port shifted to 6380 to avoid colliding with a host-level
+      # redis-server that may already own 6379. Only affects host->container
+      # access (e.g. redis-cli from the host); api/worker talk to this
+      # container over the internal Docker network at redis:6379, unaffected.
+      - "6380:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -64,9 +75,12 @@ services:
     image: multiagent-chatbot:latest
     command: celery -A src.tasks worker --loglevel=INFO --pool=solo -n multiagent@%h
     restart: unless-stopped
+    volumes:
+      - chroma-data:/data/chroma
     environment:
       REDIS_URL: redis://redis:6379
       OLLAMA_BASE_URL: http://host.docker.internal:11434
+      CHROMA_PERSIST_DIR: /data/chroma
     env_file:
       - .env
     extra_hosts:
@@ -90,3 +104,4 @@ services:
 
 volumes:
   redis-data:
+  chroma-data:
