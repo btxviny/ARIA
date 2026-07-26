@@ -1,10 +1,10 @@
 /* ============================================================
-   Multi-Agent Chatbot -- "terminal" theme
-   A dark, monospace-accented look that plays off the ASCII banner:
-   deep space background, neon violet/cyan accents, glowing edges.
+   Multi-Agent Chatbot -- theamable dark UI
+   CSS variables are injected at runtime by app.py (per theme).
+   Default values here match the Dracula theme as a fallback.
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
     --mac-bg: #0b0b14;
@@ -13,9 +13,13 @@
     --mac-border: #2a2a45;
     --mac-violet: #a259ff;
     --mac-violet-soft: rgba(162, 89, 255, 0.35);
+    --mac-violet-dark: #6b2fd6;
     --mac-cyan: #47e0d1;
+    --mac-cyan-dark: #1d8f85;
     --mac-text: #e7e6f5;
     --mac-text-dim: #9490b3;
+    --glow-1: rgba(162, 89, 255, 0.16);
+    --glow-2: rgba(71, 224, 209, 0.10);
 }
 
 /* ---- Global surface ------------------------------------------------- */
@@ -31,20 +35,20 @@ html, body,
 
 .stApp {
     background:
-        radial-gradient(ellipse 900px 500px at 15% -10%, rgba(162, 89, 255, 0.16), transparent 60%),
-        radial-gradient(ellipse 800px 500px at 110% 10%, rgba(71, 224, 209, 0.10), transparent 55%),
+        radial-gradient(ellipse 900px 500px at 15% -10%, var(--glow-1), transparent 60%),
+        radial-gradient(ellipse 800px 500px at 110% 10%, var(--glow-2), transparent 55%),
         var(--mac-bg) !important;
     color: var(--mac-text);
-    font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
 }
 
 h1, h2, h3, h4, h5, h6 {
-    font-family: 'Space Grotesk', sans-serif !important;
-    letter-spacing: 0.02em;
+    font-family: 'Inter', sans-serif !important;
+    letter-spacing: -0.01em;
 }
 
 p, span, div, label {
-    font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
 }
 
 ::selection {
@@ -77,7 +81,15 @@ p, span, div, label {
     border-color: var(--mac-border) !important;
 }
 
-/* ---- Banner (ASCII art) ------------------------------------------------- */
+/* ---- Theme bar buttons (top-right emoji toggles) ----------------------- */
+.stColumns:has(.theme-bar-col) button {
+    padding: 4px 8px !important;
+    font-size: 18px !important;
+    border-radius: 8px !important;
+    min-height: 36px !important;
+}
+
+/* ---- Banner + code blocks ----------------------------------------------- */
 [data-testid="stCode"] {
     background: var(--mac-panel) !important;
     border: 1px solid var(--mac-border);
@@ -96,13 +108,13 @@ p, span, div, label {
 
 /* ---- Buttons -------------------------------------------------------- */
 button {
-    background: linear-gradient(135deg, var(--mac-violet), #6b2fd6) !important;
+    background: linear-gradient(135deg, var(--mac-violet), var(--mac-violet-dark)) !important;
     color: #fff !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
     border-radius: 10px;
     padding: 10px 20px;
     text-align: center;
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'Inter', sans-serif;
     font-size: 15px;
     font-weight: 600;
     width: 100%;
@@ -136,10 +148,10 @@ button:active {
 
 [data-testid="stChatInput"] textarea {
     color: var(--mac-text) !important;
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'Inter', sans-serif;
 }
 
-/* ---- Chat messages ---------------------------------------------------- */
+/* ---- Chat messages ------------------------------------------------------ */
 [data-testid="stChatMessage"] {
     border-radius: 16px;
     border: 1px solid var(--mac-border);
@@ -160,11 +172,11 @@ button:active {
 }
 
 [data-testid="stChatMessageAvatarUser"] {
-    background: linear-gradient(135deg, var(--mac-violet), #6b2fd6) !important;
+    background: linear-gradient(135deg, var(--mac-violet), var(--mac-violet-dark)) !important;
 }
 
 [data-testid="stChatMessageAvatarAssistant"] {
-    background: linear-gradient(135deg, var(--mac-cyan), #1d8f85) !important;
+    background: linear-gradient(135deg, var(--mac-cyan), var(--mac-cyan-dark)) !important;
 }
 
 /* ---- "Thinking" spinner ----------------------------------------------- */
@@ -207,6 +219,38 @@ button:active {
 @keyframes mac-blink {
     0%, 80%, 100% { opacity: 0.2; }
     40% { opacity: 1; }
+}
+
+/* ---- File strip (attached files above chat input) --------------------- */
+.file-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    padding: 2px 0 6px;
+    min-height: 28px;
+}
+
+.file-chip {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(162, 89, 255, 0.12);
+    border: 1px solid rgba(162, 89, 255, 0.28);
+    border-radius: 20px;
+    padding: 2px 12px;
+    font-size: 12px;
+    font-family: 'Inter', sans-serif;
+    color: var(--mac-text-dim);
+    white-space: nowrap;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-chip-empty {
+    font-size: 12px;
+    font-family: 'Inter', sans-serif;
+    color: rgba(148, 144, 179, 0.5);
 }
 
 /* ---- Misc: captions, expanders, dividers ------------------------------- */

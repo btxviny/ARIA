@@ -1,0 +1,172 @@
+# Test Prompts for Multi-Agent Chatbot
+# ======================================
+# Prerequisites:
+#   - Upload the SfM paper PDF before running RAG prompts
+#   - Upload titanic.csv before running code execution prompts
+#   - Web search prompts need no uploads
+#
+# Each section is ordered easy → hard to catch regressions early.
+
+# ---------------------------------------------------------------------------
+# 1. WEB SEARCH + ANALYSIS
+#    Expected pipeline: web_searcher → (web_scraper) → research_analyst → answer_refiner
+# ---------------------------------------------------------------------------
+web_search:
+
+  - id: ws_01
+    label: "Simple factual lookup"
+    prompt: "What is the current version of Python and what were the main features introduced in it?"
+
+  - id: ws_02
+    label: "Comparative research"
+    prompt: "Compare COLMAP and OpenMVG as open-source Structure-from-Motion pipelines. What are the key differences in their feature matching strategies?"
+
+  - id: ws_03
+    label: "Recent news synthesis"
+    prompt: "What are the latest developments in 3D Gaussian Splatting for scene reconstruction? Summarize findings from recent papers or blog posts."
+
+  - id: ws_04
+    label: "Multi-source synthesis"
+    prompt: "What datasets are commonly used to benchmark Structure-from-Motion algorithms? List at least 3 with their characteristics."
+
+  - id: ws_05
+    label: "Deep scraping + analysis"
+    prompt: "Find and summarize the Wikipedia article on the RMS Titanic disaster. What were the main causes of the high casualty rate?"
+
+
+# ---------------------------------------------------------------------------
+# 2. RAG — Structure from Motion paper
+#    Upload the SfM PDF first, then run these.
+#    Expected pipeline: rag_retriever → research_analyst → answer_refiner
+# ---------------------------------------------------------------------------
+rag:
+
+  - id: rag_01
+    label: "Direct concept extraction"
+    prompt: "According to the uploaded paper, what is the core problem that Structure from Motion tries to solve?"
+
+  - id: rag_02
+    label: "Method detail"
+    prompt: "What feature detector or descriptor does the paper use or recommend for keypoint extraction? Explain how it works based on the paper."
+
+  - id: rag_03
+    label: "Algorithmic pipeline"
+    prompt: "Walk me through the full SfM pipeline as described in the uploaded document, from image input to sparse point cloud output."
+
+  - id: rag_04
+    label: "Limitations from the paper"
+    prompt: "What limitations or failure cases does the paper discuss for their approach?"
+
+  - id: rag_05
+    label: "RAG + web combo"
+    prompt: "The uploaded paper describes a specific SfM method. How does it compare to more recent neural approaches like NeRF or 3D Gaussian Splatting for scene reconstruction?"
+
+  - id: rag_06
+    label: "Terminology clarification"
+    prompt: "Define bundle adjustment as used in the uploaded paper. Why is it computationally expensive and how do they address that?"
+
+
+# ---------------------------------------------------------------------------
+# 3. CODE EXECUTION — Titanic CSV
+#    Upload titanic.csv first, then run these.
+#    Expected pipeline: code_executor → answer_refiner
+# ---------------------------------------------------------------------------
+code_execution:
+
+  - id: ce_01
+    label: "Basic EDA"
+    prompt: "Load the Titanic CSV and show me the first 10 rows, the column names, and basic statistics (mean, std, min, max) for all numeric columns."
+
+  - id: ce_02
+    label: "Missing data analysis"
+    prompt: "Analyze missing values in the Titanic dataset. Show the count and percentage of nulls per column, then visualize it as a horizontal bar chart."
+
+  - id: ce_03
+    label: "Survival rate breakdown"
+    prompt: "Calculate the survival rate by passenger class and by sex. Display the results as a grouped bar chart with survival rates on the y-axis."
+
+  - id: ce_04
+    label: "Age distribution"
+    prompt: "Plot the age distribution of Titanic passengers, split into survivors and non-survivors. Use overlapping histograms with transparency."
+
+  - id: ce_05
+    label: "Fare analysis"
+    prompt: "Show the distribution of ticket fares by passenger class using box plots. Identify and print any outliers (fares more than 3 standard deviations above the mean)."
+
+  - id: ce_06
+    label: "Correlation heatmap"
+    prompt: "Compute the correlation matrix for all numeric columns in the Titanic dataset and display it as a heatmap with annotated values."
+
+  - id: ce_07
+    label: "Feature engineering"
+    prompt: "Create a new column 'family_size' = SibSp + Parch + 1. Then plot survival rate vs family size as a line chart and tell me what family size had the best survival odds."
+
+  - id: ce_08
+    label: "Multi-output: chart + CSV export"
+    prompt: "Group the Titanic data by Sex and Pclass, compute survival rate and average age for each group, save the result to a CSV file, and also plot it as a grouped bar chart."
+
+  - id: ce_09
+    label: "Simple ML model"
+    prompt: >
+      Train a logistic regression model on the Titanic dataset to predict survival.
+      Use Sex, Pclass, Age (fill nulls with median), and Fare as features.
+      Print accuracy, a classification report, and plot the confusion matrix.
+
+  - id: ce_10
+    label: "Hard: PDF report generation"
+    prompt: >
+      Analyze the Titanic dataset and generate a PDF summary report that includes:
+      1. A title page with the dataset name and date
+      2. A summary statistics table
+      3. A survival rate bar chart by class and sex
+      4. A short written conclusion (2-3 sentences) about the key factors affecting survival.
+      Save it as titanic_report.pdf.
+
+
+# ---------------------------------------------------------------------------
+# 4. MULTI-TURN CONVERSATION
+#    Run these as a sequence in the same session to test memory/context.
+# ---------------------------------------------------------------------------
+multi_turn:
+
+  - id: mt_01
+    turn: 1
+    prompt: "What is Structure from Motion?"
+
+  - id: mt_02
+    turn: 2
+    prompt: "What are the main challenges with outdoor scenes specifically?"
+
+  - id: mt_03
+    turn: 3
+    prompt: "How does the paper I uploaded address those challenges?"
+
+  - id: mt_04
+    turn: 4
+    prompt: "Now switch topics — using the Titanic data, what was the overall survival rate?"
+
+  - id: mt_05
+    turn: 5
+    prompt: "Plot that as a pie chart."
+
+
+# ---------------------------------------------------------------------------
+# 5. EDGE CASES
+# ---------------------------------------------------------------------------
+edge_cases:
+
+  - id: ec_01
+    label: "Ambiguous query — should ask for clarification or make assumptions explicit"
+    prompt: "Analyze the data."
+
+  - id: ec_02
+    label: "Out-of-scope — should decline gracefully"
+    prompt: "Write me a Python script to brute-force a login page."
+
+  - id: ec_03
+    label: "No context needed — pure reasoning"
+    prompt: "Explain the difference between incremental and global Structure-from-Motion without searching the web."
+
+  - id: ec_04
+    label: "Very long answer expected"
+    prompt: "Give me a comprehensive tutorial on Structure from Motion: history, mathematical foundations, algorithms, software tools, and current research directions."

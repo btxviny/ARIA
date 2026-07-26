@@ -138,3 +138,20 @@ class DataFilesListResponse(BaseModel):
 
 class DeleteDataFileResponse(BaseModel):
     deleted: bool
+
+
+class SessionInfo(BaseModel):
+    thread_id: str
+    title: str
+    created_at: str
+    updated_at: str
+    message_count: int
+
+
+class MessageInfo(BaseModel):
+    role: str
+    content: str
+    code_run_id: str = ""
+    code_files: Optional[list] = None
+    code_result: str = ""
+    message_index: int

@@ -17,6 +17,7 @@ from loguru import logger
 
 from src.agents.ci_agent import CIAgent
 from src.config import CELERY_BROKER_URL, CELERY_RESULT_BACKEND, MAX_UPLOAD_MB
+from src.db import session_service
 from src.rag import ingest, vectorstore
 
 app = Celery(
@@ -26,6 +27,11 @@ app = Celery(
 )
 
 ci_agent = CIAgent()
+
+try:
+    session_service.init_schema()
+except Exception:
+    pass  # POSTGRES_URL not set or DB unreachable on worker start; logged inside init_schema
 
 
 @app.task
@@ -42,16 +48,54 @@ def process_chat_task(prompt: str, thread_id: str = "default") -> dict:
     """
     try:
         reply = ci_agent.generate_reply(query=prompt, thread_id=thread_id)
-        return {
-            "answer": reply.get("answer", ""),
-            "thread_id": thread_id,
-            "code_files": reply.get("code_files", []),
-            "code_run_id": reply.get("code_run_id", ""),
-            "code_result": reply.get("code_result", ""),
-        }
     except Exception as e:
         logger.exception(f"process_chat_task failed for thread_id={thread_id}")
         return {"error": str(e), "thread_id": thread_id}
+
+    result = {
+        "answer": reply.get("answer", ""),
+        "thread_id": thread_id,
+        "code_files": reply.get("code_files", []),
+        "code_run_id": reply.get("code_run_id", ""),
+        "code_result": reply.get("code_result", ""),
+    }
+
+    # Persist both messages — best-effort; a DB error must never fail the task.
+    try:
+        existing = session_service.count_messages(thread_id)
+        # The session row must exist first: `messages.thread_id` has an FK
+        # to `sessions.thread_id`, so upserting after save_message() would
+        # violate that constraint on every first message of a new thread.
+        # Title is derived from the first user message; subsequent calls pass
+        # an empty string so the UPSERT SQL keeps the original title.
+        candidate_title = prompt[:80] if existing == 0 else ""
+        session_service.upsert_session(
+            thread_id=thread_id,
+            title=candidate_title,
+            message_count=existing + 2,
+        )
+        session_service.save_message(
+            thread_id=thread_id,
+            role="user",
+            content=prompt,
+            code_run_id=None,
+            code_files=None,
+            code_result=None,
+            message_index=existing,
+        )
+        session_service.save_message(
+            thread_id=thread_id,
+            role="assistant",
+            content=result["answer"],
+            code_run_id=result["code_run_id"] or None,
+            code_files=result["code_files"] or None,
+            code_result=result["code_result"] or None,
+            message_index=existing + 1,
+        )
+    except Exception as db_err:
+        logger.warning(f"Failed to persist session for thread_id={thread_id}: {db_err}")
+
+    return result
 
 
 @app.task
