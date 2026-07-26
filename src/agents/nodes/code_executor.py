@@ -45,19 +45,13 @@ def code_executor_node(state: GraphState) -> Dict[str, Any]:
         "data_files": data_files_context,
     }
 
-    last_error = ""
+    previous_error = ""
     description = ""
     stdout, stderr = "", ""
     timed_out = False
 
     for attempt in range(1, MAX_CODEGEN_RETRIES + 1):
-        inputs = dict(base_inputs)
-        if last_error:
-            inputs["question"] = (
-                f"{base_inputs['question']}\n\n"
-                f"Attempt {attempt - 1} failed with this error:\n{last_error}\n"
-                f"Fix the issue and return corrected Python code."
-            )
+        inputs = {**base_inputs, "previous_error": previous_error}
 
         result = code_executor_agent.invoke(inputs)
         code = _clean_code(result.code)
@@ -66,7 +60,7 @@ def code_executor_node(state: GraphState) -> Dict[str, Any]:
         try:
             ast.parse(code)
         except SyntaxError as e:
-            last_error = f"SyntaxError: {e}"
+            previous_error = f"SyntaxError: {e}"
             logger.warning(f"Code executor [{run_id}] attempt {attempt} syntax error: {e}")
             continue
 
@@ -95,23 +89,26 @@ def code_executor_node(state: GraphState) -> Dict[str, Any]:
             timed_out = True
             break
         except Exception as e:
-            last_error = str(e)
+            previous_error = str(e)
             logger.warning(f"Code executor [{run_id}] attempt {attempt} subprocess error: {e}")
             continue
 
-        if proc.returncode != 0 and stderr:
-            last_error = stderr
+        run_failed = proc.returncode != 0 or bool(stderr)
+        if run_failed:
+            previous_error = (
+                f"STDOUT:\n{stdout}\nSTDERR:\n{stderr}\nReturn code: {proc.returncode}"
+            ).strip()
             logger.warning(
-                f"Code executor [{run_id}] attempt {attempt} runtime error: {stderr[:300]}"
+                f"Code executor [{run_id}] attempt {attempt} runtime error (rc={proc.returncode}): {stderr[:300] or stdout[:300]}"
             )
             continue
 
         # Success
         logger.info(f"Code executor [{run_id}] succeeded on attempt {attempt}")
-        last_error = ""
+        previous_error = ""
         break
 
-    if last_error and not timed_out:
+    if previous_error and not timed_out:
         logger.error(f"Code executor [{run_id}] failed all {MAX_CODEGEN_RETRIES} attempts")
 
     if stdout:
@@ -120,7 +117,7 @@ def code_executor_node(state: GraphState) -> Dict[str, Any]:
         logger.warning(f"Code executor [{run_id}] stderr: {stderr[:300]}")
 
     files = []
-    if not last_error:
+    if not previous_error:
         for f in sorted(output_dir.iterdir()):
             if f.name == "script.py":
                 continue
@@ -134,6 +131,7 @@ def code_executor_node(state: GraphState) -> Dict[str, Any]:
 
     return {
         "code_result": code_result,
+        "code_error": previous_error,
         "code_files": files,
         "code_run_id": run_id,
         "executed_agents": state.get("executed_agents", []) + ["code_executor"],

@@ -24,6 +24,7 @@ class CIAgent:
             "code_run_id": "",
             "code_files": [],
             "code_result": "",
+            "code_error": "",
             "data_files": [],
         }
         try:
