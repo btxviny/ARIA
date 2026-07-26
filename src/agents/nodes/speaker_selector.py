@@ -91,7 +91,7 @@ def speaker_selector_node(state: GraphState) -> Command:
         result = supervisor_agent.invoke({"context": context})
         if result and result.speaker:
             speaker = result.speaker
-            logger.info("Supervisor decided: %s — %s", speaker, result.reasoning)
+            logger.info(f"Supervisor decided: {speaker} — {result.reasoning}")
     except Exception as e:
         logger.warning("Supervisor LLM failed: %s — falling back to suggested pipeline.", e)
 
