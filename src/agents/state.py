@@ -16,10 +16,12 @@ class GraphState(MessagesState):
     search_error: str
     scraped_content: str
     cited_urls: List[str]
+    web_result_cards: List[dict]  # [{title, url, favicon_url, snippet}]
     rag_context: str
     cited_sources: List[str]
     code_result: str
     code_error: str
     code_files: List[dict]
     code_run_id: str
+    code_attempt: int
     data_files: List[dict]

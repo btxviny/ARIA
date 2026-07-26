@@ -1,3 +1,7 @@
+import base64
+import html
+import io
+import re
 import time
 import uuid
 
@@ -32,19 +36,19 @@ THEMES: dict[str, dict[str, str]] = {
         "--glow-2": "rgba(71,224,209,0.10)",
     },
     "🍪 Cookie": {
-        "--mac-bg": "#1c1c1c",
-        "--mac-bg-alt": "#242424",
-        "--mac-panel": "#2e2e2e80",
-        "--mac-border": "#3d3d3d",
+        "--mac-bg": "#1a1008",
+        "--mac-bg-alt": "#221508",
+        "--mac-panel": "#2e1e0880",
+        "--mac-border": "#4a3018",
         "--mac-violet": "#f97316",
         "--mac-violet-soft": "rgba(249,115,22,0.35)",
-        "--mac-violet-dark": "#ea580c",
-        "--mac-cyan": "#fb923c",
-        "--mac-cyan-dark": "#c2660a",
-        "--mac-text": "#f5f0eb",
-        "--mac-text-dim": "#a39e98",
-        "--glow-1": "rgba(249,115,22,0.12)",
-        "--glow-2": "rgba(251,146,60,0.08)",
+        "--mac-violet-dark": "#c2540a",
+        "--mac-cyan": "#fbbf24",
+        "--mac-cyan-dark": "#b45309",
+        "--mac-text": "#fef3e2",
+        "--mac-text-dim": "#c49e70",
+        "--glow-1": "rgba(249,115,22,0.14)",
+        "--glow-2": "rgba(251,191,36,0.09)",
     },
 }
 
@@ -78,6 +82,14 @@ def _fetch_sessions(limit: int = SESSIONS_PAGE_SIZE) -> list[dict]:
         return r.json()
     except requests.RequestException:
         return []
+
+
+def _delete_session(thread_id: str) -> bool:
+    try:
+        r = requests.delete(f"{API_BASE_URL}/sessions/{thread_id}", timeout=5)
+        return r.status_code == 204
+    except requests.RequestException:
+        return False
 
 
 def _fetch_session_messages(thread_id: str) -> list[dict]:
@@ -130,9 +142,13 @@ def _reset_conversation() -> None:
 # --- UI ---------------------------------------------------------------------
 def _render_sidebar() -> None:
     with st.sidebar:
-        st.title("Multi-Agent Chatbot")
-        st.caption(SUBTITLE)
+        _render_banner()
         st.divider()
+
+        # Theme toggle
+        _render_theme_toggle()
+        st.divider()
+
         if st.button("＋  New conversation", use_container_width=True):
             _reset_conversation()
             st.rerun()
@@ -146,35 +162,43 @@ def _render_sidebar() -> None:
         else:
             for session in past_sessions:
                 raw_title = session.get("title") or "Untitled"
-                display_label = (raw_title[:40] + "…") if len(raw_title) > 43 else raw_title
+                display_label = (raw_title[:34] + "…") if len(raw_title) > 37 else raw_title
                 is_active = session["thread_id"] == st.session_state.thread_id
-                if st.button(
-                    display_label,
-                    key=f"session_{session['thread_id']}",
-                    use_container_width=True,
-                    type="primary" if is_active else "secondary",
-                ):
-                    if not is_active:
-                        # Loading a past session restores display_history for
-                        # display only. LangGraph MemorySaver state is not
-                        # restored, so the next question starts with fresh context.
-                        msgs = _fetch_session_messages(session["thread_id"])
-                        st.session_state.thread_id = session["thread_id"]
-                        st.session_state.display_history = [
-                            {
-                                "role": m["role"],
-                                "content": m["content"],
-                                "code_run_id": m.get("code_run_id", ""),
-                                "code_files": m.get("code_files") or [],
-                                "code_result": m.get("code_result", ""),
-                            }
-                            for m in msgs
-                        ]
-                        st.session_state.task_id = None
-                        st.session_state.waiting_for_response = False
-                        st.session_state.request_started_at = None
-                        st.session_state.uploaded_signatures = set()
-                        st.session_state.data_files_cache = {}
+                tid = session["thread_id"]
+                col_title, col_del = st.columns([6, 1], gap="small", vertical_alignment="center")
+                with col_title:
+                    if st.button(
+                        display_label,
+                        key=f"session_{tid}",
+                        use_container_width=True,
+                        type="primary" if is_active else "secondary",
+                    ):
+                        if not is_active:
+                            msgs = _fetch_session_messages(tid)
+                            st.session_state.thread_id = tid
+                            st.session_state.display_history = [
+                                {
+                                    "role": m["role"],
+                                    "content": m["content"],
+                                    "code_run_id": m.get("code_run_id", ""),
+                                    "code_files": m.get("code_files") or [],
+                                    "code_result": m.get("code_result", ""),
+                                    "web_result_cards": m.get("web_result_cards") or [],
+                                }
+                                for m in msgs
+                            ]
+                            st.session_state.task_id = None
+                            st.session_state.waiting_for_response = False
+                            st.session_state.request_started_at = None
+                            st.session_state.uploaded_signatures = set()
+                            st.session_state.data_files_cache = {}
+                            _fetch_sessions.clear()
+                            st.rerun()
+                with col_del:
+                    if st.button("✕", key=f"del_{tid}", help="Delete", use_container_width=True):
+                        _delete_session(tid)
+                        if is_active:
+                            _reset_conversation()
                         _fetch_sessions.clear()
                         st.rerun()
 
@@ -193,32 +217,96 @@ def _inject_theme() -> None:
     st.markdown(f"<style>{vars_css}</style>", unsafe_allow_html=True)
 
 
-def _render_theme_bar() -> None:
-    """Compact emoji theme switcher pinned to the top-right of the content area."""
-    _, right = st.columns([9, 1])
-    with right:
-        btn_cols = st.columns(len(THEMES))
-        for i, name in enumerate(THEME_NAMES):
-            with btn_cols[i]:
-                st.button(
-                    name.split()[0],          # just the emoji
-                    key=f"theme_btn_{i}",
-                    help=name.split(maxsplit=1)[-1],  # tooltip shows the name
-                    type="primary" if st.session_state.theme == name else "secondary",
-                    use_container_width=True,
-                    on_click=_set_theme,
-                    args=(name,),
-                )
+def _render_theme_toggle() -> None:
+    """Two-button theme toggle rendered inside the sidebar."""
+    current = st.session_state.get("theme", THEME_NAMES[0])
+    col1, col2 = st.columns(2, gap="small")
+    for col, name in zip([col1, col2], THEME_NAMES):
+        emoji, label = name.split(" ", 1)
+        with col:
+            if st.button(
+                f"{emoji}  {label}",
+                use_container_width=True,
+                type="primary" if name == current else "secondary",
+                key=f"theme_btn_{name}",
+            ):
+                st.session_state.theme = name
+                st.rerun()
 
 
-def _set_theme(name: str) -> None:
-    st.session_state.theme = name
+@st.cache_data(show_spinner=False)
+def _banner_png_b64(color_hex: str) -> str:
+    from PIL import Image, ImageDraw, ImageFont
+    import matplotlib
+
+    font_path = matplotlib.get_data_path() + "/fonts/ttf/DejaVuSansMono.ttf"
+    h_str = color_hex.lstrip("#")
+    fill = (int(h_str[0:2], 16), int(h_str[2:4], 16), int(h_str[4:6], 16), 255)
+
+    lines = BANNER.split("\n")
+    font_size = 13
+    font = ImageFont.truetype(font_path, font_size)
+    line_h = font_size + 3
+    dummy = Image.new("RGBA", (1, 1))
+    draw = ImageDraw.Draw(dummy)
+    max_w = max((draw.textlength(ln, font=font) for ln in lines), default=0)
+    w, h = int(max_w) + 4, line_h * len(lines) + 4
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    for i, line in enumerate(lines):
+        draw.text((2, 2 + i * line_h), line, font=font, fill=fill)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode()
 
 
 def _render_banner() -> None:
-    _, mid, _ = st.columns([1, 10, 1])
-    with mid:
-        st.code(BANNER, language=None)
+    theme = st.session_state.get("theme", THEME_NAMES[0])
+    color_hex = THEMES[theme]["--mac-violet"]
+    b64 = _banner_png_b64(color_hex)
+    st.markdown(
+        f'<div class="mac-banner-wrap">'
+        f'<img class="mac-banner-img" src="data:image/png;base64,{b64}" alt="Multi-Agent Chatbot"/>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _render_web_results(cards: list) -> None:
+    """Render web search result cards with favicon, title, snippet, and link."""
+    if not cards:
+        return
+    card_html_parts = []
+    for c in cards:
+        title = c.get("title", "").replace("<", "&lt;").replace(">", "&gt;")
+        url = c.get("url", "")
+        snippet = c.get("snippet", "").replace("<", "&lt;").replace(">", "&gt;")
+        favicon = c.get("favicon_url", "")
+        try:
+            from urllib.parse import urlparse
+            display_domain = urlparse(url).netloc
+        except Exception:
+            display_domain = url
+        favicon_img = (
+            f'<img src="{favicon}" class="web-card-favicon" onerror="this.style.display=\'none\'">'
+            if favicon else ""
+        )
+        card_html_parts.append(
+            f"""<a href="{url}" target="_blank" rel="noopener noreferrer" class="web-card">
+  <div class="web-card-header">
+    {favicon_img}
+    <span class="web-card-domain">{display_domain}</span>
+  </div>
+  <div class="web-card-title">{title}</div>
+  <div class="web-card-snippet">{snippet}</div>
+</a>"""
+        )
+    cards_html = "\n".join(card_html_parts)
+    st.markdown(
+        f'<div class="web-results-label">Web sources</div>'
+        f'<div class="web-results-grid">{cards_html}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def _render_code_outputs(code_result: str, code_files: list, code_run_id: str) -> None:
@@ -250,16 +338,33 @@ def _render_code_outputs(code_result: str, code_files: list, code_run_id: str) -
             )
 
 
+def _clean_content(content: str, has_web_cards: bool) -> str:
+    """Strip the trailing 'Sources:' block when structured web cards are shown."""
+    if not has_web_cards:
+        return content
+    cleaned = re.sub(
+        r"\n{0,2}\*{0,2}Sources?\*{0,2}:[\s\S]*$",
+        "",
+        content,
+        flags=re.IGNORECASE,
+    ).rstrip()
+    return cleaned if cleaned else content
+
+
 def _render_history() -> None:
     for message in st.session_state.display_history:
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-            if message["role"] == "assistant" and message.get("code_run_id"):
-                _render_code_outputs(
-                    message.get("code_result", ""),
-                    message.get("code_files", []),
-                    message["code_run_id"],
-                )
+            has_cards = bool(message.get("web_result_cards"))
+            content = _clean_content(message["content"], has_cards)
+            st.markdown(content)
+            if message["role"] == "assistant":
+                _render_web_results(message.get("web_result_cards", []))
+                if message.get("code_run_id"):
+                    _render_code_outputs(
+                        message.get("code_result", ""),
+                        message.get("code_files", []),
+                        message["code_run_id"],
+                    )
 
 
 @st.fragment(run_every=RESPONSE_POLL_INTERVAL)
@@ -293,6 +398,7 @@ def _handle_response() -> None:
             "code_files": payload.get("code_files", []),
             "code_run_id": payload.get("code_run_id", ""),
             "code_result": payload.get("code_result", ""),
+            "web_result_cards": payload.get("web_result_cards", []),
         }
         st.session_state.display_history.append(entry)
         st.session_state.task_id = None
@@ -332,8 +438,6 @@ def main() -> None:
     _init_session_state()
     _inject_theme()
     _render_sidebar()
-    _render_theme_bar()
-
     _render_banner()
 
     _render_history()

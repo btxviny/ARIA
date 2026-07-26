@@ -221,7 +221,6 @@ def render_file_strip(thread_id: str) -> None:
     with st.sidebar:
         st.divider()
         st.markdown("**Files**")
-        st.caption("PDF / TXT / MD → RAG  ·  CSV / Excel / JSON / Parquet → code analysis")
 
         uploaded = st.file_uploader(
             "Upload files",
