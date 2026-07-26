@@ -35,94 +35,19 @@ THEMES: dict[str, dict[str, str]] = {
         "--glow-2": "rgba(71,224,209,0.10)",
     },
     "🍪 Cookie": {
-        "--mac-bg": "#1c1c1c",
-        "--mac-bg-alt": "#242424",
-        "--mac-panel": "#2e2e2e80",
-        "--mac-border": "#3d3d3d",
+        "--mac-bg": "#1a1008",
+        "--mac-bg-alt": "#221508",
+        "--mac-panel": "#2e1e0880",
+        "--mac-border": "#4a3018",
         "--mac-violet": "#f97316",
         "--mac-violet-soft": "rgba(249,115,22,0.35)",
-        "--mac-violet-dark": "#ea580c",
-        "--mac-cyan": "#fb923c",
-        "--mac-cyan-dark": "#c2660a",
-        "--mac-text": "#f5f0eb",
-        "--mac-text-dim": "#a39e98",
-        "--glow-1": "rgba(249,115,22,0.12)",
-        "--glow-2": "rgba(251,146,60,0.08)",
-    },
-    "🌊 Ocean": {
-        "--mac-bg": "#060d1a",
-        "--mac-bg-alt": "#0a1628",
-        "--mac-panel": "#0d1f3880",
-        "--mac-border": "#1a3a5c",
-        "--mac-violet": "#38bdf8",
-        "--mac-violet-soft": "rgba(56,189,248,0.30)",
-        "--mac-violet-dark": "#0369a1",
-        "--mac-cyan": "#67e8f9",
-        "--mac-cyan-dark": "#0891b2",
-        "--mac-text": "#e0f2fe",
-        "--mac-text-dim": "#7cb9d8",
-        "--glow-1": "rgba(56,189,248,0.14)",
-        "--glow-2": "rgba(103,232,249,0.09)",
-    },
-    "🌲 Forest": {
-        "--mac-bg": "#080f08",
-        "--mac-bg-alt": "#0d160d",
-        "--mac-panel": "#11201180",
-        "--mac-border": "#1e3a1e",
-        "--mac-violet": "#4ade80",
-        "--mac-violet-soft": "rgba(74,222,128,0.30)",
-        "--mac-violet-dark": "#16a34a",
-        "--mac-cyan": "#86efac",
-        "--mac-cyan-dark": "#15803d",
-        "--mac-text": "#dcfce7",
-        "--mac-text-dim": "#6dbd8a",
-        "--glow-1": "rgba(74,222,128,0.14)",
-        "--glow-2": "rgba(134,239,172,0.09)",
-    },
-    "🌸 Sakura": {
-        "--mac-bg": "#130a10",
-        "--mac-bg-alt": "#1e0f1a",
-        "--mac-panel": "#27132180",
-        "--mac-border": "#4a1e38",
-        "--mac-violet": "#f472b6",
-        "--mac-violet-soft": "rgba(244,114,182,0.32)",
-        "--mac-violet-dark": "#be185d",
-        "--mac-cyan": "#fb7185",
-        "--mac-cyan-dark": "#be123c",
-        "--mac-text": "#fce7f3",
-        "--mac-text-dim": "#c4789e",
-        "--glow-1": "rgba(244,114,182,0.15)",
-        "--glow-2": "rgba(251,113,133,0.09)",
-    },
-    "🔥 Inferno": {
-        "--mac-bg": "#0f0500",
-        "--mac-bg-alt": "#1a0a00",
-        "--mac-panel": "#251000",
-        "--mac-border": "#4a1e00",
-        "--mac-violet": "#f97316",
-        "--mac-violet-soft": "rgba(249,115,22,0.32)",
-        "--mac-violet-dark": "#c2410c",
+        "--mac-violet-dark": "#c2540a",
         "--mac-cyan": "#fbbf24",
         "--mac-cyan-dark": "#b45309",
-        "--mac-text": "#fff7ed",
-        "--mac-text-dim": "#c48a50",
-        "--glow-1": "rgba(249,115,22,0.16)",
-        "--glow-2": "rgba(251,191,36,0.10)",
-    },
-    "💚 Matrix": {
-        "--mac-bg": "#000500",
-        "--mac-bg-alt": "#000d00",
-        "--mac-panel": "#00140080",
-        "--mac-border": "#003300",
-        "--mac-violet": "#00ff41",
-        "--mac-violet-soft": "rgba(0,255,65,0.25)",
-        "--mac-violet-dark": "#00a629",
-        "--mac-cyan": "#00cc33",
-        "--mac-cyan-dark": "#007a1f",
-        "--mac-text": "#ccffcc",
-        "--mac-text-dim": "#4d994d",
-        "--glow-1": "rgba(0,255,65,0.12)",
-        "--glow-2": "rgba(0,204,51,0.08)",
+        "--mac-text": "#fef3e2",
+        "--mac-text-dim": "#c49e70",
+        "--glow-1": "rgba(249,115,22,0.14)",
+        "--glow-2": "rgba(251,191,36,0.09)",
     },
 }
 
@@ -219,6 +144,11 @@ def _render_sidebar() -> None:
         st.title("Multi-Agent Chatbot")
         st.caption(SUBTITLE)
         st.divider()
+
+        # Theme toggle
+        _render_theme_toggle()
+        st.divider()
+
         if st.button("＋  New conversation", use_container_width=True):
             _reset_conversation()
             st.rerun()
@@ -226,59 +156,16 @@ def _render_sidebar() -> None:
         # ---- Past conversations ------------------------------------------------
         st.divider()
         st.markdown("**Conversations**")
-        # Style the 🗑 delete buttons as small dim icons
-        st.markdown("""
-<style>
-[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:has(p:empty),
-[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] p:only-child {
-    all: unset;
-}
-</style>
-<script>
-(function() {
-    function styleTrashBtns() {
-        document.querySelectorAll('[data-testid="stSidebar"] button').forEach(btn => {
-            if (btn.textContent.trim() === '🗑') {
-                btn.classList.add('mac-trash-btn');
-            }
-        });
-    }
-    const ob = new MutationObserver(styleTrashBtns);
-    ob.observe(document.body, {childList: true, subtree: true});
-    styleTrashBtns();
-})();
-</script>
-<style>
-.mac-trash-btn {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 4px !important;
-    min-height: 0 !important;
-    font-size: 14px !important;
-    opacity: 0.45 !important;
-    transition: opacity 0.15s ease, color 0.15s ease !important;
-    width: 28px !important;
-    color: var(--mac-text-dim) !important;
-}
-.mac-trash-btn:hover {
-    opacity: 1 !important;
-    color: #ff5555 !important;
-    transform: none !important;
-    box-shadow: none !important;
-}
-</style>
-""", unsafe_allow_html=True)
         past_sessions = _fetch_sessions(st.session_state.sessions_limit)
         if not past_sessions:
             st.caption("No saved conversations yet.")
         else:
             for session in past_sessions:
                 raw_title = session.get("title") or "Untitled"
-                display_label = (raw_title[:35] + "…") if len(raw_title) > 38 else raw_title
+                display_label = (raw_title[:34] + "…") if len(raw_title) > 37 else raw_title
                 is_active = session["thread_id"] == st.session_state.thread_id
                 tid = session["thread_id"]
-                col_title, col_del = st.columns([5, 1])
+                col_title, col_del = st.columns([6, 1], gap="small", vertical_alignment="center")
                 with col_title:
                     if st.button(
                         display_label,
@@ -308,7 +195,7 @@ def _render_sidebar() -> None:
                             _fetch_sessions.clear()
                             st.rerun()
                 with col_del:
-                    if st.button("🗑", key=f"del_{tid}", help="Delete this conversation"):
+                    if st.button("✕", key=f"del_{tid}", help="Delete", use_container_width=True):
                         _delete_session(tid)
                         if is_active:
                             _reset_conversation()
@@ -330,104 +217,21 @@ def _inject_theme() -> None:
     st.markdown(f"<style>{vars_css}</style>", unsafe_allow_html=True)
 
 
-def _render_theme_picker() -> None:
-    """Centered circle-group theme switcher rendered in the main area."""
+def _render_theme_toggle() -> None:
+    """Two-button theme toggle rendered inside the sidebar."""
     current = st.session_state.get("theme", THEME_NAMES[0])
-
-    per_swatch_css = "\n".join(
-        f'[data-testid="stRadioGroup"] label[data-testid="stRadioOption"]:nth-child({i + 1}) '
-        f'{{ border-color: {v["--mac-violet"]} !important; '
-        f'background: {v["--mac-violet"]}33 !important; }}\n'
-        f'[data-testid="stRadioGroup"] label[data-testid="stRadioOption"]:nth-child({i + 1}) p '
-        f'{{ color: {v["--mac-violet"]} !important; }}'
-        for i, v in enumerate(THEMES.values())
-    )
-    active_css = "\n".join(
-        f'[data-testid="stRadioGroup"] label[data-testid="stRadioOption"]:nth-child({i + 1})[data-selected="true"] '
-        f'{{ background: {v["--mac-violet"]} !important; '
-        f'box-shadow: 0 0 8px {v["--mac-violet"]}66 !important; }}\n'
-        f'[data-testid="stRadioGroup"] label[data-testid="stRadioOption"]:nth-child({i + 1})[data-selected="true"] p '
-        f'{{ color: #fff !important; }}'
-        for i, v in enumerate(THEMES.values())
-    )
-    base_css = """
-    /* Hide the radio widget label */
-    [data-testid="stRadio"] > label { display: none !important; }
-    /* Remove Streamlit focus outline */
-    [data-testid="stRadioGroup"] label[data-testid="stRadioOption"]:focus-within,
-    [data-testid="stRadioGroup"] label[data-testid="stRadioOption"]:focus {
-        outline: none !important;
-        box-shadow: inherit !important;
-    }
-    /* Unified circle-group container */
-    [data-testid="stRadioGroup"] {
-        flex-direction: row !important;
-        gap: 5px !important;
-        background: rgba(255,255,255,0.05) !important;
-        border-radius: 30px !important;
-        padding: 5px 7px !important;
-        flex-wrap: nowrap !important;
-    }
-    /* Each option as a circle */
-    [data-testid="stRadioGroup"] label[data-testid="stRadioOption"] {
-        padding: 0 !important;
-        margin: 0 !important;
-        width: 34px !important;
-        height: 34px !important;
-        min-width: 34px !important;
-        min-height: 34px !important;
-        max-width: 34px !important;
-        max-height: 34px !important;
-        border-radius: 50% !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        cursor: pointer !important;
-        border: 2px solid transparent !important;
-        transition: all 0.15s ease !important;
-    }
-    /* Wrapper divs: flatten to flex center */
-    [data-testid="stRadioGroup"] label[data-testid="stRadioOption"] > div {
-        display: contents !important;
-    }
-    [data-testid="stRadioGroup"] label[data-testid="stRadioOption"] > div > div {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 0 !important;
-    }
-    /* Hide the radio dot indicator */
-    [data-testid="stRadioGroup"] label[data-testid="stRadioOption"] > div > div > div:first-child {
-        display: none !important;
-    }
-    /* Emoji text */
-    [data-testid="stRadioGroup"] label[data-testid="stRadioOption"] p {
-        margin: 0 !important;
-        padding: 0 !important;
-        font-size: 18px !important;
-        line-height: 1 !important;
-    }
-    """
-    st.markdown(f"<style>{base_css}\n{per_swatch_css}\n{active_css}</style>", unsafe_allow_html=True)
-
-    _, col, _ = st.columns([1, 2, 1])
-    with col:
-        choice = st.radio(
-            "Theme",
-            options=THEME_NAMES,
-            index=THEME_NAMES.index(current),
-            format_func=lambda n: n.split()[0],
-            horizontal=True,
-            label_visibility="collapsed",
-            key="theme_radio",
-        )
-    if choice and choice != current:
-        st.session_state.theme = choice
-        st.rerun()
-
-
-def _set_theme(name: str) -> None:
-    st.session_state.theme = name
+    col1, col2 = st.columns(2, gap="small")
+    for col, name in zip([col1, col2], THEME_NAMES):
+        emoji, label = name.split(" ", 1)
+        with col:
+            if st.button(
+                f"{emoji}  {label}",
+                use_container_width=True,
+                type="primary" if name == current else "secondary",
+                key=f"theme_btn_{name}",
+            ):
+                st.session_state.theme = name
+                st.rerun()
 
 
 @st.cache_data(show_spinner=False)
@@ -620,7 +424,6 @@ def main() -> None:
     _inject_theme()
     _render_sidebar()
     _render_banner()
-    _render_theme_picker()
 
     _render_history()
 
