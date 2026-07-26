@@ -12,10 +12,14 @@ def answer_refiner_node(state: GraphState) -> Dict[str, Any]:
     cited_urls = state.get("cited_urls", [])
     cited_sources = state.get("cited_sources", [])
     code_result = state.get("code_result", "")
+    code_error = state.get("code_error", "")
     code_files = state.get("code_files", [])
     code_run_id = state.get("code_run_id", "")
     code_files_summary = (
         f"Generated files: {[f['filename'] for f in code_files]}" if code_files else ""
+    )
+    code_error_summary = (
+        f"Code Execution Failed (all retries exhausted):\n{code_error}" if code_error else ""
     )
 
     context = f"""
@@ -29,6 +33,7 @@ def answer_refiner_node(state: GraphState) -> Dict[str, Any]:
         Document Context: {state.get("rag_context", "")},
         Code Execution Result: {code_result},
         {code_files_summary}
+        {code_error_summary}
         cited_urls: {cited_urls}
         cited_sources: {cited_sources}
     """

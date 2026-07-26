@@ -18,7 +18,6 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import chromadb
-from langchain_chroma import Chroma
 from langchain_core.documents import Document
 
 from src.rag.embeddings import embeddings
@@ -83,14 +82,13 @@ def add_documents(thread_id: str, source_id: str, chunks: List[Document]) -> int
     for chunk in chunks:
         chunk.metadata["uploaded_at"] = uploaded_at
 
-    store = Chroma(
-        collection_name=_collection_name(thread_id),
-        embedding_function=embeddings,
-        client=_get_client(),
-        create_collection_if_not_exists=True,
-    )
+    texts = [chunk.page_content for chunk in chunks]
+    metadatas = [chunk.metadata for chunk in chunks]
     ids = [f"{source_id}_{i}" for i in range(len(chunks))]
-    store.add_documents(chunks, ids=ids)
+    embedding_vectors = embeddings.embed_documents(texts)
+
+    collection = _get_client().get_or_create_collection(_collection_name(thread_id))
+    collection.add(ids=ids, embeddings=embedding_vectors, documents=texts, metadatas=metadatas)
     return len(chunks)
 
 
@@ -111,19 +109,22 @@ def query(thread_id: str, query_text: str, k: int = RAG_TOP_K) -> List[Dict[str,
     """Top-k relevant chunks for a query. Empty list if no sources are uploaded."""
     if not _collection_exists(thread_id):
         return []
-    store = Chroma(
-        collection_name=_collection_name(thread_id),
-        embedding_function=embeddings,
-        client=_get_client(),
-        create_collection_if_not_exists=False,
+    query_embedding = embeddings.embed_query(query_text)
+    collection = _get_client().get_collection(_collection_name(thread_id))
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=k,
+        include=["documents", "metadatas", "distances"],
     )
-    results = store.similarity_search_with_score(query_text, k=k)
+    docs = results.get("documents", [[]])[0]
+    metas = results.get("metadatas", [[]])[0]
+    dists = results.get("distances", [[]])[0]
     return [
         {
-            "content": doc.page_content,
-            "filename": doc.metadata.get("filename", "unknown"),
-            "page": doc.metadata.get("page"),
-            "score": score,
+            "content": doc,
+            "filename": meta.get("filename", "unknown"),
+            "page": meta.get("page"),
+            "score": dist,
         }
-        for doc, score in results
+        for doc, meta, dist in zip(docs, metas, dists)
     ]
