@@ -1,7 +1,10 @@
-"""Unified file upload sidebar.
+"""Unified file upload panel.
 
 - PDF / TXT / MD  → ingested into Chroma for RAG (Celery task, polled)
 - XLSX / XLS / CSV / JSON / PARQUET / TSV → saved as raw data files for the code executor
+
+Public entry points:
+  render_file_strip(thread_id)  — sidebar uploader/manager + file chips above the chat input
 """
 import base64
 import time
@@ -159,7 +162,7 @@ def _poll_pending_ingests(thread_id: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Public entry point
+# Helpers
 # ---------------------------------------------------------------------------
 
 def _fmt_size(size_bytes: int) -> str:
@@ -170,74 +173,105 @@ def _fmt_size(size_bytes: int) -> str:
     return f"{size_bytes / 1024 / 1024:.1f} MB"
 
 
-def render_sources_sidebar(thread_id: str) -> None:
-    _init_state()
-    st.markdown("**Files**")
-    st.caption("PDF / TXT / MD → RAG  ·  Excel / CSV / JSON → code analysis")
-
-    uploaded_files = st.file_uploader(
-        "Upload files",
-        type=ALL_TYPES,
-        accept_multiple_files=True,
-        key="source_uploader",
-        label_visibility="collapsed",
-    )
-
+def _handle_new_uploads(thread_id: str, uploaded_files) -> bool:
+    """Process newly uploaded files. Returns True if any upload was processed."""
     new_files = [
         f for f in (uploaded_files or [])
         if f.file_id not in st.session_state.uploaded_signatures
     ]
-    if new_files:
-        for f in new_files:
-            st.session_state.uploaded_signatures.add(f.file_id)
+    if not new_files:
+        return False
 
-        rag_files = [f for f in new_files if f.name.rsplit(".", 1)[-1].lower() in RAG_TYPES]
-        data_files = [f for f in new_files if f.name.rsplit(".", 1)[-1].lower() in DATA_TYPES]
+    for f in new_files:
+        st.session_state.uploaded_signatures.add(f.file_id)
 
-        if rag_files:
-            try:
-                tasks = _ingest_rag_files(thread_id, rag_files)
-                now = time.time()
-                for t in tasks:
-                    st.session_state.pending_ingest_tasks.append(
-                        {"filename": t["filename"], "task_id": t["task_id"], "started_at": now}
-                    )
-            except requests.RequestException as e:
-                st.error(f"RAG upload failed: {e}")
+    rag_files = [f for f in new_files if f.name.rsplit(".", 1)[-1].lower() in RAG_TYPES]
+    data_files = [f for f in new_files if f.name.rsplit(".", 1)[-1].lower() in DATA_TYPES]
 
-        if data_files:
-            try:
-                _upload_data_files(thread_id, data_files)
-                _invalidate_data(thread_id)
-            except requests.RequestException as e:
-                st.error(f"Data file upload failed: {e}")
+    if rag_files:
+        try:
+            tasks = _ingest_rag_files(thread_id, rag_files)
+            now = time.time()
+            for t in tasks:
+                st.session_state.pending_ingest_tasks.append(
+                    {"filename": t["filename"], "task_id": t["task_id"], "started_at": now}
+                )
+        except requests.RequestException as e:
+            st.error(f"RAG upload failed: {e}")
 
-    if st.session_state.pending_ingest_tasks:
-        _poll_pending_ingests(thread_id)
+    if data_files:
+        try:
+            _upload_data_files(thread_id, data_files)
+            _invalidate_data(thread_id)
+        except requests.RequestException as e:
+            st.error(f"Data file upload failed: {e}")
 
-    # --- RAG sources ---
-    rag_sources = _get_rag_sources(thread_id)
-    for s in rag_sources:
-        col1, col2 = st.columns([5, 1])
-        with col1:
-            st.caption(f"📄 {s['filename']} ({s['num_chunks']} chunks)")
-        with col2:
-            if st.button("🗑", key=f"del_rag_{s['source_id']}", help="Delete"):
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Public entry point
+# ---------------------------------------------------------------------------
+
+def render_file_strip(thread_id: str) -> None:
+    """Sidebar uploader + manage panel; file chips rendered above the chat input."""
+    _init_state()
+
+    # --- Sidebar: uploader + file list (reliable — avoids st.popover/file_uploader issues) ---
+    with st.sidebar:
+        st.divider()
+        st.markdown("**Files**")
+        st.caption("PDF / TXT / MD → RAG  ·  CSV / Excel / JSON / Parquet → code analysis")
+
+        uploaded = st.file_uploader(
+            "Upload files",
+            type=ALL_TYPES,
+            accept_multiple_files=True,
+            key="source_uploader",
+            label_visibility="collapsed",
+        )
+        if _handle_new_uploads(thread_id, uploaded):
+            st.rerun()
+
+        rag_sources = _get_rag_sources(thread_id)
+        data_file_list = _get_data_files(thread_id)
+
+        for s in rag_sources:
+            c1, c2 = st.columns([5, 1])
+            c1.caption(f"📄 {s['filename']} ({s['num_chunks']} chunks)")
+            if c2.button("🗑", key=f"del_rag_{s['source_id']}", help="Delete"):
                 _delete_rag_source(thread_id, s["source_id"])
                 _invalidate_rag(thread_id)
                 st.rerun()
-
-    # --- Data files ---
-    data_file_list = _get_data_files(thread_id)
-    for f in data_file_list:
-        col1, col2 = st.columns([5, 1])
-        with col1:
-            st.caption(f"📊 {f['filename']} ({_fmt_size(f['size_bytes'])})")
-        with col2:
-            if st.button("🗑", key=f"del_df_{f['filename']}", help="Delete"):
+        for f in data_file_list:
+            c1, c2 = st.columns([5, 1])
+            c1.caption(f"📊 {f['filename']} ({_fmt_size(f['size_bytes'])})")
+            if c2.button("🗑", key=f"del_df_{f['filename']}", help="Delete"):
                 _delete_data_file(thread_id, f["filename"])
                 _invalidate_data(thread_id)
                 st.rerun()
 
-    if not rag_sources and not data_file_list:
-        st.caption("No files uploaded yet.")
+        if not rag_sources and not data_file_list:
+            st.caption("No files uploaded yet.")
+
+    # --- Main area: polling + file chips ---
+    rag_sources = _get_rag_sources(thread_id)
+    data_file_list = _get_data_files(thread_id)
+
+    if st.session_state.pending_ingest_tasks:
+        _poll_pending_ingests(thread_id)
+
+    all_names = (
+        [f"📄 {s['filename']}" for s in rag_sources]
+        + [f"📊 {f['filename']}" for f in data_file_list]
+    )
+    if all_names:
+        chips_html = "".join(
+            f'<span class="file-chip">{name}</span>' for name in all_names
+        )
+        st.markdown(f'<div class="file-strip">{chips_html}</div>', unsafe_allow_html=True)
+    elif not st.session_state.pending_ingest_tasks:
+        st.markdown(
+            '<div class="file-strip"><span class="file-chip-empty">No files attached · upload via sidebar</span></div>',
+            unsafe_allow_html=True,
+        )

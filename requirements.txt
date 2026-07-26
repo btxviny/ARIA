@@ -49,3 +49,4 @@ openpyxl
 python-dotenv
 pyyaml
 loguru
+psycopg2-binary
