@@ -10,6 +10,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+# --- PostgreSQL -------------------------------------------------------------
+# Full DSN understood by psycopg2.connect(dsn=...).
+# When unset (local dev without Docker), session persistence is disabled gracefully.
+POSTGRES_URL: str | None = os.environ.get("POSTGRES_URL")
+
+
 # --- Celery / Redis ---------------------------------------------------------
 REDIS_URL: str = os.environ.get("REDIS_URL", "redis://localhost:6379")
 CELERY_BROKER_URL: str = os.environ.get("CELERY_BROKER_URL", REDIS_URL)
