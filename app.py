@@ -1,4 +1,6 @@
+import base64
 import html
+import io
 import time
 import uuid
 
@@ -217,9 +219,39 @@ def _set_theme(name: str) -> None:
     st.session_state.theme = name
 
 
+@st.cache_data(show_spinner=False)
+def _banner_png_b64() -> str:
+    from PIL import Image, ImageDraw, ImageFont
+    import matplotlib
+
+    font_path = (
+        matplotlib.get_data_path() + "/fonts/ttf/DejaVuSansMono.ttf"
+    )
+    lines = BANNER.split("\n")
+    font_size = 13
+    font = ImageFont.truetype(font_path, font_size)
+    line_h = font_size + 3
+    # Measure max line width
+    dummy = Image.new("RGBA", (1, 1))
+    draw = ImageDraw.Draw(dummy)
+    max_w = max((draw.textlength(ln, font=font) for ln in lines), default=0)
+    w, h = int(max_w) + 4, line_h * len(lines) + 4
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    violet = (162, 89, 255, 255)
+    for i, line in enumerate(lines):
+        draw.text((2, 2 + i * line_h), line, font=font, fill=violet)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode()
+
+
 def _render_banner() -> None:
+    b64 = _banner_png_b64()
     st.markdown(
-        f'<div class="mac-banner-wrap"><pre class="mac-banner">{html.escape(BANNER)}</pre></div>',
+        f'<div class="mac-banner-wrap">'
+        f'<img class="mac-banner-img" src="data:image/png;base64,{b64}" alt="Multi-Agent Chatbot"/>'
+        f'</div>',
         unsafe_allow_html=True,
     )
 
