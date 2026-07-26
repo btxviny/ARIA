@@ -26,10 +26,13 @@ html, body,
 .stApp,
 [data-testid="stAppViewContainer"],
 [data-testid="stMainBlockContainer"],
-[data-testid="stBottom"],
-[data-testid="stBottomBlockContainer"],
 [data-testid="stHeader"] {
     background: transparent !important;
+}
+
+[data-testid="stBottom"],
+[data-testid="stBottomBlockContainer"] {
+    background: var(--mac-bg) !important;
 }
 
 .stApp {
@@ -148,21 +151,50 @@ p, span, div, label {
     filter: drop-shadow(0 0 6px var(--mac-violet));
 }
 
-/* ── Chat input ──────────────────────────────────────────── */
-[data-testid="stChatInput"] {
-    background: var(--mac-panel) !important;
-    border: 1px solid var(--mac-border) !important;
-    border-radius: 14px !important;
-    box-shadow: 0 4px 24px -8px rgba(0,0,0,0.5) !important;
-    backdrop-filter: blur(8px) !important;
+/* Sidebar banner: smaller padding, scaled to fit */
+[data-testid="stSidebar"] .mac-banner-wrap {
+    padding: 0.5rem 0 0.25rem;
 }
-[data-testid="stChatInput"]:focus-within {
-    border-color: var(--mac-violet) !important;
-    box-shadow: 0 0 0 3px var(--mac-violet-soft) !important;
+
+[data-testid="stSidebar"] .mac-banner-img {
+    max-width: 90%;
+    filter: drop-shadow(0 0 4px var(--mac-violet));
+}
+
+/* ── Chat input ──────────────────────────────────────────── */
+[data-testid="stChatInput"],
+[data-testid="stChatInput"] *:not(button):not(svg):not(path) {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+}
+[data-testid="stChatInput"] {
+    background: rgba(255,255,255,0.05) !important;
+    border-radius: 14px !important;
+    backdrop-filter: blur(8px) !important;
 }
 [data-testid="stChatInput"] textarea {
     color: var(--mac-text) !important;
     font-family: 'Inter', sans-serif !important;
+}
+
+/* ── File uploader (sidebar) ─────────────────────────────── */
+[data-testid="stSidebar"] [data-testid="stFileUploader"] {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
+    background: transparent !important;
+    border: 1px dashed var(--mac-border) !important;
+    border-radius: 10px !important;
+    box-shadow: none !important;
+}
+[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"]:hover {
+    border-color: var(--mac-violet) !important;
+    background: rgba(162,89,255,0.04) !important;
 }
 
 /* ── Chat messages ───────────────────────────────────────── */
@@ -177,12 +209,11 @@ p, span, div, label {
     border: none;
 }
 
-/* USER: right-side bubble */
+/* USER: right-side bubble — avatar stays on left, bubble indented to the right */
 [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
-    flex-direction: row-reverse;
     background: linear-gradient(135deg, rgba(162,89,255,0.13), rgba(162,89,255,0.04));
     border: 1px solid rgba(162,89,255,0.22);
-    margin-left: 8%;
+    margin-left: 14%;
 }
 
 /* ASSISTANT: left-side bubble */

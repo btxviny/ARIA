@@ -142,8 +142,7 @@ def _reset_conversation() -> None:
 # --- UI ---------------------------------------------------------------------
 def _render_sidebar() -> None:
     with st.sidebar:
-        st.title("Multi-Agent Chatbot")
-        st.caption(SUBTITLE)
+        _render_banner()
         st.divider()
 
         # Theme toggle

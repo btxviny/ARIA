@@ -43,6 +43,7 @@ class CIAgent:
                 "code_files": event.get("code_files", []),
                 "code_run_id": event.get("code_run_id", ""),
                 "code_result": event.get("code_result", ""),
+                "web_result_cards": event.get("web_result_cards", []),
             }
         except Exception as e:
             logger.exception(f"[thread_id={thread_id}] Error during agent execution")

@@ -31,6 +31,7 @@ OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 #--- OpenAI (cloud) ---
 llm = ChatOpenAI(
     api_key=os.environ["OPENAI_API_KEY"],
-    model="gpt-4o-mini",
+    #model="gpt-4o-mini",
+    model="gpt-5.4-mini",
     http_client=httpx.Client(verify=False),
 )
