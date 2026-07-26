@@ -33,16 +33,21 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 _CREATE_MESSAGES = """
 CREATE TABLE IF NOT EXISTS messages (
-    id            SERIAL PRIMARY KEY,
-    thread_id     TEXT NOT NULL REFERENCES sessions(thread_id) ON DELETE CASCADE,
-    role          TEXT NOT NULL,
-    content       TEXT NOT NULL DEFAULT '',
-    code_run_id   TEXT,
-    code_files    JSONB,
-    code_result   TEXT,
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    message_index INT NOT NULL
+    id                SERIAL PRIMARY KEY,
+    thread_id         TEXT NOT NULL REFERENCES sessions(thread_id) ON DELETE CASCADE,
+    role              TEXT NOT NULL,
+    content           TEXT NOT NULL DEFAULT '',
+    code_run_id       TEXT,
+    code_files        JSONB,
+    code_result       TEXT,
+    web_result_cards  JSONB,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    message_index     INT NOT NULL
 );
+"""
+
+_MIGRATE_WEB_RESULT_CARDS = """
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS web_result_cards JSONB;
 """
 
 _CREATE_INDEX = """
@@ -72,6 +77,7 @@ def init_schema() -> None:
             cur.execute(_CREATE_SESSIONS)
             cur.execute(_CREATE_MESSAGES)
             cur.execute(_CREATE_INDEX)
+            cur.execute(_MIGRATE_WEB_RESULT_CARDS)
         conn.commit()
     finally:
         pool.putconn(conn)
@@ -134,6 +140,7 @@ def save_message(
     code_files: list | None,
     code_result: str | None,
     message_index: int,
+    web_result_cards: list | None = None,
 ) -> None:
     """Insert one message row."""
     if not POSTGRES_URL:
@@ -146,8 +153,8 @@ def save_message(
                 """
                 INSERT INTO messages
                     (thread_id, role, content, code_run_id,
-                     code_files, code_result, message_index)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                     code_files, code_result, web_result_cards, message_index)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     thread_id,
@@ -156,6 +163,7 @@ def save_message(
                     code_run_id or None,
                     Json(code_files) if code_files else None,
                     code_result or None,
+                    Json(web_result_cards) if web_result_cards else None,
                     message_index,
                 ),
             )
@@ -196,6 +204,20 @@ def list_sessions(limit: int = 50) -> list[dict]:
         pool.putconn(conn)
 
 
+def delete_session(thread_id: str) -> None:
+    """Delete a session and all its messages (cascade)."""
+    if not POSTGRES_URL:
+        return
+    pool = _get_pool()
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM sessions WHERE thread_id = %s", (thread_id,))
+        conn.commit()
+    finally:
+        pool.putconn(conn)
+
+
 def get_messages(thread_id: str) -> list[dict]:
     """Return all messages for a thread ordered by message_index."""
     if not POSTGRES_URL:
@@ -207,7 +229,7 @@ def get_messages(thread_id: str) -> list[dict]:
             cur.execute(
                 """
                 SELECT role, content, code_run_id,
-                       code_files, code_result, message_index
+                       code_files, code_result, web_result_cards, message_index
                 FROM messages
                 WHERE thread_id = %s
                 ORDER BY message_index
@@ -222,7 +244,8 @@ def get_messages(thread_id: str) -> list[dict]:
                 "code_run_id": r[2] or "",
                 "code_files": r[3] or [],
                 "code_result": r[4] or "",
-                "message_index": r[5],
+                "web_result_cards": r[5] or [],
+                "message_index": r[6],
             }
             for r in rows
         ]

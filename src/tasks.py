@@ -58,6 +58,7 @@ def process_chat_task(prompt: str, thread_id: str = "default") -> dict:
         "code_files": reply.get("code_files", []),
         "code_run_id": reply.get("code_run_id", ""),
         "code_result": reply.get("code_result", ""),
+        "web_result_cards": reply.get("web_result_cards", []),
     }
 
     # Persist both messages — best-effort; a DB error must never fail the task.
@@ -90,6 +91,7 @@ def process_chat_task(prompt: str, thread_id: str = "default") -> dict:
             code_run_id=result["code_run_id"] or None,
             code_files=result["code_files"] or None,
             code_result=result["code_result"] or None,
+            web_result_cards=result["web_result_cards"] or None,
             message_index=existing + 1,
         )
     except Exception as db_err:

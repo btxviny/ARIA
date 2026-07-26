@@ -1,5 +1,6 @@
 import os
 from typing import Any, Dict
+from urllib.parse import urlparse
 
 import httpx
 from loguru import logger
@@ -8,9 +9,17 @@ from tavily import TavilyClient
 from src.agents.agents import web_searcher_agent
 from src.agents.nodes._common import NO_SEARCH_RESULTS
 from src.agents.state import GraphState
-from src.agents.utils import dedup_urls
+from src.agents.utils import dedup_urls, format_history
 
 tavily_client = TavilyClient(api_key=os.environ.get("TAVILY_API_KEY"))
+
+
+def _favicon_url(url: str) -> str:
+    try:
+        domain = urlparse(url).netloc
+        return f"https://www.google.com/s2/favicons?domain={domain}&sz=32"
+    except Exception:
+        return ""
 
 
 def _summarize_search_error(error: Exception) -> str:
@@ -36,12 +45,14 @@ def web_searcher_node(state: GraphState) -> Dict[str, Any]:
     """Generates a search query and executes it via Tavily."""
     question = state.get("question", "")
     plan = state.get("plan", "")
+    history = format_history(state.get("messages", []), state.get("summary", ""))
 
-    search_query = web_searcher_agent.invoke({"question": question, "plan": plan})
+    search_query = web_searcher_agent.invoke({"question": question, "plan": plan, "history": history})
     logger.info(f"Web Searcher generated query: {search_query}")
 
     results = []
     urls = []
+    cards = []
     search_status = "ok"
     search_error = ""
     try:
@@ -49,6 +60,12 @@ def web_searcher_node(state: GraphState) -> Dict[str, Any]:
         for r in response.get("results", []):
             results.append(f"Title: {r['title']}\nURL: {r['url']}\nContent: {r['content']}\n")
             urls.append(r['url'])
+            cards.append({
+                "title": r.get("title", ""),
+                "url": r["url"],
+                "snippet": r.get("content", "")[:200],
+                "favicon_url": _favicon_url(r["url"]),
+            })
         search_results = "\n---\n".join(results) if results else NO_SEARCH_RESULTS
         if not results:
             search_status = "empty"
@@ -59,10 +76,12 @@ def web_searcher_node(state: GraphState) -> Dict[str, Any]:
         search_results = f"(web search unavailable: {search_error})"
 
     logger.info(f"Web Searcher found {len(results)} results")
+    existing_cards = state.get("web_result_cards", [])
     return {
         "search_results": search_results,
         "search_status": search_status,
         "search_error": search_error,
         "cited_urls": dedup_urls(state.get("cited_urls", []) + urls),
+        "web_result_cards": existing_cards + cards,
         "executed_agents": state.get("executed_agents", []) + ['web_searcher'],
     }
