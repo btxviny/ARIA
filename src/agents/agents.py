@@ -95,7 +95,8 @@ code_executor_prompt = ChatPromptTemplate.from_messages(
             "Question: {question}\nOrchestrator's Plan: {plan}\n"
             "Search Results (if any):\n{search_results}\n"
             "Document Context (if any):\n{rag_context}\n"
-            "Uploaded data files available (filename -> full path):\n{data_files}",
+            "Uploaded data files available (filename -> full path):\n{data_files}\n"
+            "Previous execution error (empty on first attempt):\n{previous_error}",
         ),
     ]
 )
