@@ -308,7 +308,8 @@ code_executor:
       3. NEVER use `input()` or any interactive prompts — the code runs non-interactively.
       4. ALWAYS close matplotlib figures after saving: `plt.close()`.
       5. Print a brief summary of what was done to stdout (e.g. "Saved plot.png", "Generated report.pdf").
-      6. Handle errors gracefully and print them to stdout so the user can see what went wrong.
+      6. Do NOT wrap the entire script in a broad try/except block. Let exceptions propagate naturally so they appear in stderr and can be caught for retries. You may catch specific, expected exceptions (e.g. a missing optional column), print a helpful diagnostic, and then re-raise with `raise`.
+      12. **Retry context**: If "Previous execution error" is non-empty, you are on a retry. Read the STDOUT and STDERR carefully to understand exactly what went wrong in the previous attempt, then fix only that specific issue. Common pitfalls: wrong column names (use df.columns to check), missing imports, wrong file paths, incorrect pandas/numpy API usage.
       7. Use only these available libraries (they are pre-installed): matplotlib, pandas, numpy, requests, reportlab, fpdf2, scipy, pillow (PIL), openpyxl, json, csv, os, pathlib, datetime, math, random, statistics, re, io, base64.
       8. If the request involves fetching live data from a public API, use `requests` and handle failures gracefully.
       9. Keep the code clean and focused — no unused imports or variables.
