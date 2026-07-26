@@ -1,5 +1,5 @@
 """Session history routes: list past conversations and retrieve their messages."""
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 from loguru import logger
 
 from src.db import session_service
@@ -17,6 +17,17 @@ def list_sessions(
         return session_service.list_sessions(limit=limit)
     except Exception as e:
         logger.exception("list_sessions failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{thread_id}", status_code=204)
+def delete_session(thread_id: str) -> Response:
+    """Permanently delete a session and all its messages."""
+    try:
+        session_service.delete_session(thread_id)
+        return Response(status_code=204)
+    except Exception as e:
+        logger.exception(f"delete_session failed for thread_id={thread_id}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

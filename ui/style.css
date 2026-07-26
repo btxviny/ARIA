@@ -81,13 +81,6 @@ p, span, div, label {
     border-color: var(--mac-border) !important;
 }
 
-/* ---- Theme bar buttons (top-right emoji toggles) ----------------------- */
-.stColumns:has(.theme-bar-col) button {
-    padding: 4px 8px !important;
-    font-size: 18px !important;
-    border-radius: 8px !important;
-    min-height: 36px !important;
-}
 
 /* ---- Banner ------------------------------------------------------------- */
 .mac-banner-wrap {
@@ -100,7 +93,7 @@ p, span, div, label {
 .mac-banner-img {
     max-width: 100%;
     height: auto;
-    filter: drop-shadow(0 0 14px rgba(162, 89, 255, 0.5));
+    filter: drop-shadow(0 0 6px var(--mac-violet));
 }
 
 /* ---- Code blocks -------------------------------------------------------- */
