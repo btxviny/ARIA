@@ -166,27 +166,111 @@ p, span, div, label {
 }
 
 /* ── Chat messages ───────────────────────────────────────── */
+
 [data-testid="stChatMessage"] {
-    border-radius: 16px;
-    border: 1px solid var(--mac-border);
-    background: var(--mac-panel);
-    padding: 4px 6px;
+    border-radius: 18px;
+    padding: 14px 18px;
     margin-bottom: 10px;
     backdrop-filter: blur(6px);
+    gap: 12px;
+    align-items: flex-start;
+    border: none;
 }
+
+/* USER: right-side bubble */
 [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
-    border-color: var(--mac-violet-soft);
-    background: linear-gradient(135deg, rgba(162,89,255,0.10), rgba(162,89,255,0.02));
+    flex-direction: row-reverse;
+    background: linear-gradient(135deg, rgba(162,89,255,0.13), rgba(162,89,255,0.04));
+    border: 1px solid rgba(162,89,255,0.22);
+    margin-left: 8%;
 }
+
+/* ASSISTANT: left-side bubble */
 [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) {
-    border-color: rgba(71,224,209,0.22);
-    background: linear-gradient(135deg, rgba(71,224,209,0.07), rgba(71,224,209,0.02));
+    background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+    border: 1px solid var(--mac-border);
+    margin-right: 2%;
 }
+
+/* Avatars */
+[data-testid="stChatMessageAvatarUser"],
+[data-testid="stChatMessageAvatarAssistant"] {
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    align-self: flex-start !important;
+    margin-top: 2px !important;
+}
+
 [data-testid="stChatMessageAvatarUser"] {
     background: linear-gradient(135deg, var(--mac-violet), var(--mac-violet-dark)) !important;
 }
+
 [data-testid="stChatMessageAvatarAssistant"] {
     background: linear-gradient(135deg, var(--mac-cyan), var(--mac-cyan-dark)) !important;
+}
+
+/* Content area */
+[data-testid="stChatMessageContent"] {
+    min-width: 0 !important;
+    flex: 1 !important;
+}
+
+/* Typography inside messages */
+[data-testid="stChatMessageContent"] p {
+    line-height: 1.72 !important;
+    margin-bottom: 0.55rem !important;
+    font-size: 14px !important;
+    color: var(--mac-text) !important;
+}
+
+[data-testid="stChatMessageContent"] ul,
+[data-testid="stChatMessageContent"] ol {
+    padding-left: 1.4rem !important;
+    margin-bottom: 0.6rem !important;
+}
+
+[data-testid="stChatMessageContent"] li {
+    line-height: 1.65 !important;
+    margin-bottom: 0.25rem !important;
+    font-size: 14px !important;
+    color: var(--mac-text) !important;
+}
+
+[data-testid="stChatMessageContent"] strong {
+    color: var(--mac-text) !important;
+    font-weight: 600 !important;
+}
+
+[data-testid="stChatMessageContent"] h1,
+[data-testid="stChatMessageContent"] h2,
+[data-testid="stChatMessageContent"] h3,
+[data-testid="stChatMessageContent"] h4 {
+    color: var(--mac-text) !important;
+    margin-top: 1rem !important;
+    margin-bottom: 0.4rem !important;
+    font-weight: 600 !important;
+}
+
+/* Links — theme cyan, violet on hover */
+[data-testid="stChatMessageContent"] a {
+    color: var(--mac-cyan) !important;
+    text-decoration: underline !important;
+    text-decoration-color: rgba(71,224,209,0.30) !important;
+    text-underline-offset: 3px !important;
+    transition: color 0.15s ease, text-decoration-color 0.15s ease !important;
+    word-break: break-all;
+}
+
+[data-testid="stChatMessageContent"] a:hover {
+    color: var(--mac-violet) !important;
+    text-decoration-color: var(--mac-violet-soft) !important;
 }
 
 /* ── Code blocks ─────────────────────────────────────────── */

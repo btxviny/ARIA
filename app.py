@@ -1,6 +1,7 @@
 import base64
 import html
 import io
+import re
 import time
 import uuid
 
@@ -338,10 +339,25 @@ def _render_code_outputs(code_result: str, code_files: list, code_run_id: str) -
             )
 
 
+def _clean_content(content: str, has_web_cards: bool) -> str:
+    """Strip the trailing 'Sources:' block when structured web cards are shown."""
+    if not has_web_cards:
+        return content
+    cleaned = re.sub(
+        r"\n{0,2}\*{0,2}Sources?\*{0,2}:[\s\S]*$",
+        "",
+        content,
+        flags=re.IGNORECASE,
+    ).rstrip()
+    return cleaned if cleaned else content
+
+
 def _render_history() -> None:
     for message in st.session_state.display_history:
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+            has_cards = bool(message.get("web_result_cards"))
+            content = _clean_content(message["content"], has_cards)
+            st.markdown(content)
             if message["role"] == "assistant":
                 _render_web_results(message.get("web_result_cards", []))
                 if message.get("code_run_id"):
