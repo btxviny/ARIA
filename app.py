@@ -1,3 +1,4 @@
+import html
 import time
 import uuid
 
@@ -167,6 +168,7 @@ def _render_sidebar() -> None:
                                 "code_run_id": m.get("code_run_id", ""),
                                 "code_files": m.get("code_files") or [],
                                 "code_result": m.get("code_result", ""),
+                                "web_result_cards": m.get("web_result_cards") or [],
                             }
                             for m in msgs
                         ]
@@ -216,9 +218,47 @@ def _set_theme(name: str) -> None:
 
 
 def _render_banner() -> None:
-    _, mid, _ = st.columns([1, 10, 1])
-    with mid:
-        st.code(BANNER, language=None)
+    st.markdown(
+        f'<div class="mac-banner-wrap"><pre class="mac-banner">{html.escape(BANNER)}</pre></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _render_web_results(cards: list) -> None:
+    """Render web search result cards with favicon, title, snippet, and link."""
+    if not cards:
+        return
+    card_html_parts = []
+    for c in cards:
+        title = c.get("title", "").replace("<", "&lt;").replace(">", "&gt;")
+        url = c.get("url", "")
+        snippet = c.get("snippet", "").replace("<", "&lt;").replace(">", "&gt;")
+        favicon = c.get("favicon_url", "")
+        try:
+            from urllib.parse import urlparse
+            display_domain = urlparse(url).netloc
+        except Exception:
+            display_domain = url
+        favicon_img = (
+            f'<img src="{favicon}" class="web-card-favicon" onerror="this.style.display=\'none\'">'
+            if favicon else ""
+        )
+        card_html_parts.append(
+            f"""<a href="{url}" target="_blank" rel="noopener noreferrer" class="web-card">
+  <div class="web-card-header">
+    {favicon_img}
+    <span class="web-card-domain">{display_domain}</span>
+  </div>
+  <div class="web-card-title">{title}</div>
+  <div class="web-card-snippet">{snippet}</div>
+</a>"""
+        )
+    cards_html = "\n".join(card_html_parts)
+    st.markdown(
+        f'<div class="web-results-label">Web sources</div>'
+        f'<div class="web-results-grid">{cards_html}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def _render_code_outputs(code_result: str, code_files: list, code_run_id: str) -> None:
@@ -254,12 +294,14 @@ def _render_history() -> None:
     for message in st.session_state.display_history:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
-            if message["role"] == "assistant" and message.get("code_run_id"):
-                _render_code_outputs(
-                    message.get("code_result", ""),
-                    message.get("code_files", []),
-                    message["code_run_id"],
-                )
+            if message["role"] == "assistant":
+                _render_web_results(message.get("web_result_cards", []))
+                if message.get("code_run_id"):
+                    _render_code_outputs(
+                        message.get("code_result", ""),
+                        message.get("code_files", []),
+                        message["code_run_id"],
+                    )
 
 
 @st.fragment(run_every=RESPONSE_POLL_INTERVAL)
@@ -293,6 +335,7 @@ def _handle_response() -> None:
             "code_files": payload.get("code_files", []),
             "code_run_id": payload.get("code_run_id", ""),
             "code_result": payload.get("code_result", ""),
+            "web_result_cards": payload.get("web_result_cards", []),
         }
         st.session_state.display_history.append(entry)
         st.session_state.task_id = None
