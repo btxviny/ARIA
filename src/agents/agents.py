@@ -35,7 +35,7 @@ history_summarizer_agent = history_summarizer_prompt | llm | StrOutputParser()
 web_searcher_prompt = ChatPromptTemplate.from_messages(
     [
         ("system", prompts["web_searcher"]["prompt"]),
-        ("human", "Question: {question}\nOrchestrator's Plan: {plan}"),
+        ("human", "Question: {question}\nOrchestrator's Plan: {plan}\nConversation history: {history}"),
     ]
 )
 web_searcher_agent = web_searcher_prompt | llm | StrOutputParser()
@@ -101,11 +101,11 @@ code_executor_prompt = ChatPromptTemplate.from_messages(
     ]
 )
 code_executor_agent = code_executor_prompt | llm.with_structured_output(CodeGenOutput)
-#-------------------------------Speaker Selector------------------------------------------------
-speaker_selector_prompt = ChatPromptTemplate.from_messages(
+#-------------------------------Supervisor------------------------------------------------------]
+supervisor_prompt = ChatPromptTemplate.from_messages(
     [
-        ("system", prompts["speaker_selector"]["prompt"]),
-        ("human", "Context: {context}"),
+        ("system", prompts["supervisor"]["prompt"]),
+        ("human", "Context:\n{context}"),
     ]
 )
-speaker_selector_agent = speaker_selector_prompt | llm.with_structured_output(NextSpeaker)
+supervisor_agent = supervisor_prompt | llm.with_structured_output(NextSpeaker)

@@ -25,8 +25,8 @@ AgentName = Literal[
 
 class NextSpeaker(BaseModel):
     """The next agent to run in the multi-agent workflow."""
+    reasoning: str = Field(description="1-2 sentences explaining why this agent should run next.")
     speaker: Literal[
-        "orchestrator",
         "web_searcher",
         "web_scraper",
         "rag_retriever",
@@ -34,7 +34,7 @@ class NextSpeaker(BaseModel):
         "answer_refiner",
         "code_executor",
         "END",
-    ] = Field(description="Name of the next agent to run.")
+    ] = Field(description="Name of the next agent to run, or END to terminate.")
 
 
 class CodeGenOutput(BaseModel):
@@ -154,4 +154,5 @@ class MessageInfo(BaseModel):
     code_run_id: str = ""
     code_files: Optional[list] = None
     code_result: str = ""
+    web_result_cards: Optional[list] = None
     message_index: int
