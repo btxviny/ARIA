@@ -61,11 +61,6 @@ def _summarise_state(state: GraphState) -> str:
 
 
 def speaker_selector_node(state: GraphState) -> Command:
-    # Terminal: answer has been written
-    if state.get("resolved", False):
-        logger.debug("Answer already refined, terminating.")
-        return Command(goto=END, update={"next": END, "resolved": False})
-
     pipeline = state.get("pipeline", []) or []
     executed = state.get("executed_agents", [])
     remaining = [a for a in pipeline if a not in executed]

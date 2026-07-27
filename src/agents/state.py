@@ -7,7 +7,6 @@ class GraphState(MessagesState):
     messages: Annotated[list, add_messages]
     summary: str
     executed_agents: List[str]
-    resolved: bool
     question: str
     plan: str
     pipeline: List[str]
