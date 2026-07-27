@@ -1,4 +1,5 @@
 # Multi-Agent Chatbot stack.
+name: aria
 #
 # Services:
 #   redis   - broker + result backend for Celery
