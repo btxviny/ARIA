@@ -38,7 +38,8 @@ workflow.add_edge("web_searcher", "supervisor")
 workflow.add_edge("web_scraper", "supervisor")
 workflow.add_edge("rag_retriever", "supervisor")
 workflow.add_edge("research_analyst", "supervisor")
-workflow.add_edge("answer_refiner", END)
 workflow.add_edge("code_executor", "supervisor")
+workflow.add_edge("answer_refiner", END)
+
 
 app = workflow.compile(checkpointer=memory)
