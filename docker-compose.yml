@@ -1,4 +1,4 @@
-# Multi-Agent Chatbot stack.
+# ARIA stack.
 name: aria
 #
 # Services:
@@ -34,13 +34,13 @@ services:
       # postgres that may already be listening on 5432.
       - "5433:5432"
     environment:
-      POSTGRES_DB: chatbot
-      POSTGRES_USER: chatbot
-      POSTGRES_PASSWORD: chatbot
+      POSTGRES_DB: aria
+      POSTGRES_USER: aria
+      POSTGRES_PASSWORD: aria
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U chatbot -d chatbot"]
+      test: ["CMD-SHELL", "pg_isready -U aria -d aria"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -64,7 +64,7 @@ services:
 
   api:
     build: .
-    image: multiagent-chatbot:latest
+    image: aria:latest
     command: uvicorn src.api:app --host 0.0.0.0 --port 5000
     restart: unless-stopped
     ports:
@@ -79,7 +79,7 @@ services:
       API_PORT: "5000"
       CODE_OUTPUTS_DIR: /data/code_outputs
       UPLOADS_DIR: /data/uploads
-      POSTGRES_URL: postgresql://chatbot:chatbot@postgres:5432/chatbot
+      POSTGRES_URL: postgresql://aria:aria@postgres:5432/aria
     env_file:
       - .env
     extra_hosts:
@@ -100,8 +100,8 @@ services:
 
   worker:
     build: .
-    image: multiagent-chatbot:latest
-    command: celery -A src.tasks worker --loglevel=INFO --pool=solo -n multiagent@%h
+    image: aria:latest
+    command: celery -A src.tasks worker --loglevel=INFO --pool=solo -n aria@%h
     restart: unless-stopped
     volumes:
       - chroma-data:/data/chroma
@@ -113,7 +113,7 @@ services:
       CHROMA_PERSIST_DIR: /data/chroma
       CODE_OUTPUTS_DIR: /data/code_outputs
       UPLOADS_DIR: /data/uploads
-      POSTGRES_URL: postgresql://chatbot:chatbot@postgres:5432/chatbot
+      POSTGRES_URL: postgresql://aria:aria@postgres:5432/aria
     env_file:
       - .env
     extra_hosts:
@@ -126,7 +126,7 @@ services:
 
   ui:
     build: .
-    image: multiagent-chatbot:latest
+    image: aria:latest
     command: streamlit run app.py --server.address=0.0.0.0 --server.port=8501 --server.headless=true
     restart: unless-stopped
     ports:
