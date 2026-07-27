@@ -1,9 +1,5 @@
 """Celery tasks that wrap the multi-agent graph and the RAG source store.
 
-A single `CIAgent` instance is shared across tasks (the LangGraph app is
-stateless; per-conversation memory lives in the graph checkpointer keyed by
-`thread_id`).
-
 The RAG source-management tasks (`ingest_source_task`, `list_sources_task`,
 `delete_source_task`) are the ONLY way FastAPI (`src/api.py`) may touch the
 vector store -- it runs in a separate process from this worker and must not
@@ -15,7 +11,7 @@ import uuid
 from celery import Celery
 from loguru import logger
 
-from src.agents.ci_agent import CIAgent
+from src.agents.graph import app as agent_graph
 from src.config import CELERY_BROKER_URL, CELERY_RESULT_BACKEND, MAX_UPLOAD_MB
 from src.db import session_service
 from src.rag import ingest, vectorstore
@@ -25,8 +21,6 @@ app = Celery(
     broker=CELERY_BROKER_URL,
     backend=CELERY_RESULT_BACKEND,
 )
-
-ci_agent = CIAgent()
 
 try:
     session_service.init_schema()
@@ -47,7 +41,34 @@ def process_chat_task(prompt: str, thread_id: str = "default") -> dict:
         its own id so separate chats do not share history.
     """
     try:
-        reply = ci_agent.generate_reply(query=prompt, thread_id=thread_id)
+        config = {"configurable": {"thread_id": thread_id}}
+        inputs = {
+            "question": prompt,
+            "executed_agents": [],
+            "pipeline": [],
+            "plan": "",
+            "code_run_id": "",
+            "code_files": [],
+            "code_result": "",
+            "code_error": "",
+            "data_files": [],
+        }
+        event = None
+        for event in agent_graph.stream(inputs, config, stream_mode="values"):
+            pass
+        if event is None:
+            return {"error": "Graph produced no output", "thread_id": thread_id}
+        logger.info(f"[thread_id={thread_id}] Final state keys: {list(event.keys())}")
+        messages = event.get("messages", [])
+        final_answer = messages[-1].content if messages else ""
+        logger.success(f"[thread_id={thread_id}] Final response: {final_answer[:200]}...")
+        reply = {
+            "answer": final_answer,
+            "code_files": event.get("code_files", []),
+            "code_run_id": event.get("code_run_id", ""),
+            "code_result": event.get("code_result", ""),
+            "web_result_cards": event.get("web_result_cards", []),
+        }
     except Exception as e:
         logger.exception(f"process_chat_task failed for thread_id={thread_id}")
         return {"error": str(e), "thread_id": thread_id}

@@ -7,7 +7,7 @@ from loguru import logger
 
 from src.agents.agents import orchestrator_agent
 from src.agents.state import GraphState
-from src.agents.utils import format_history, normalize_pipeline
+from src.agents.utils import format_history
 from src.config import UPLOADS_DIR
 from src.rag import vectorstore
 
@@ -62,7 +62,6 @@ def orchestrator_node(state: GraphState, config: RunnableConfig) -> Dict[str, An
         pipeline = ["answer_refiner"]
         reasoning = reasoning or "Fallback: orchestrator failed to produce a pipeline."
 
-    pipeline = normalize_pipeline(pipeline)
     plan_text = f"{reasoning}\nPipeline: {' -> '.join(pipeline)}"
 
     logger.warning(f"Orchestrator plan: {plan_text}")
