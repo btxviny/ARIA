@@ -17,7 +17,7 @@ from src.db import session_service
 from src.rag import ingest, vectorstore
 
 app = Celery(
-    "multiagent_chatbot",
+    "aria",
     broker=CELERY_BROKER_URL,
     backend=CELERY_RESULT_BACKEND,
 )
