@@ -6,6 +6,18 @@ from src.agents.agents import supervisor_agent
 from src.agents.nodes._common import NO_RAG_RESULTS, NO_SCRAPED_CONTENT, NO_SEARCH_RESULTS
 from src.agents.nodes.code_executor import MAX_SUPERVISOR_RETRIES
 from src.agents.state import GraphState
+from src.agents.utils import VALID_PIPELINE_AGENTS
+
+_RESEARCH_TRIGGERS = {"web_searcher", "web_scraper", "rag_retriever"}
+
+
+def _needs_research_analyst(executed: list[str]) -> bool:
+    """Return True if a data-gathering agent ran but research_analyst hasn't yet."""
+    return (
+        any(a in _RESEARCH_TRIGGERS for a in executed)
+        and "research_analyst" not in executed
+        and "code_executor" not in executed
+    )
 
 
 def _summarise_state(state: GraphState) -> str:
@@ -96,12 +108,17 @@ def speaker_selector_node(state: GraphState) -> Command:
         logger.warning("Supervisor LLM failed: %s — falling back to suggested pipeline.", e)
 
     # Fallback: if LLM failed or returned something invalid, use remaining[0]
-    valid_agents = {"web_searcher", "web_scraper", "rag_retriever", "research_analyst", "answer_refiner", "code_executor", "END"}
+    valid_agents = VALID_PIPELINE_AGENTS | {"END"}
     if speaker not in valid_agents or speaker in executed:
         speaker = remaining[0] if remaining else "answer_refiner"
         logger.warning("Supervisor fallback → %s", speaker)
 
     if speaker == "END":
         return Command(goto=END, update={"next": END, "resolved": False})
+
+    # Guard: never skip research_analyst when data agents ran without code_executor
+    if speaker == "answer_refiner" and _needs_research_analyst(executed):
+        logger.info("Invariant: routing to research_analyst before answer_refiner.")
+        return Command(goto="research_analyst", update={"next": "research_analyst"})
 
     return Command(goto=speaker, update={"next": speaker})

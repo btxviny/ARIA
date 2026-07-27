@@ -49,31 +49,3 @@ def dedup_urls(urls: list[str]) -> list[str]:
 
 
 VALID_PIPELINE_AGENTS = set(get_args(AgentName))
-
-
-def normalize_pipeline(pipeline: list[str]) -> list[str]:
-    """Deduplicate, validate, and enforce invariants:
-    - research_analyst whenever search/scrape/rag is present
-    - answer_refiner always last
-    """
-    seen = set()
-    out = []
-    for a in pipeline:
-        if a in VALID_PIPELINE_AGENTS and a not in seen:
-            seen.add(a)
-            out.append(a)
-
-    if (
-        ("web_searcher" in out or "web_scraper" in out or "rag_retriever" in out)
-        and "research_analyst" not in out
-        and "code_executor" not in out
-    ):
-        if "answer_refiner" in out:
-            out.insert(out.index("answer_refiner"), "research_analyst")
-        else:
-            out.append("research_analyst")
-    
-    if "answer_refiner" in out:
-        out.remove("answer_refiner")
-    out.append("answer_refiner")
-    return out
