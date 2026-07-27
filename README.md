@@ -126,6 +126,39 @@ docker compose up --build
 
 Open **http://localhost:8501**.
 
+### Useful Docker commands
+
+```bash
+# First run or after dependency/code changes
+docker compose up --build -d
+
+# Start without rebuilding
+docker compose up -d
+
+# Stop containers (keeps volumes/data)
+docker compose down
+
+# Stop and wipe all volumes (clean slate)
+docker compose down -v
+
+# View logs for all services
+docker compose logs -f
+
+# View logs for a specific service
+docker compose logs -f worker
+docker compose logs -f api
+
+# Restart a single service after code changes
+docker compose restart worker
+
+# Check container status
+docker compose ps
+
+# Open a shell inside a running container
+docker compose exec api bash
+docker compose exec worker bash
+```
+
 ### Command line
 
 ```bash
