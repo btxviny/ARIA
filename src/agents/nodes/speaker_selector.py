@@ -109,7 +109,7 @@ def speaker_selector_node(state: GraphState) -> Command:
         logger.warning("Supervisor fallback → %s", speaker)
 
     if speaker == "END":
-        return Command(goto=END, update={"next": END, "resolved": False})
+        return Command(goto=END, update={"next": END})
 
     # Guard: never skip research_analyst when data agents ran without code_executor
     if speaker == "answer_refiner" and _needs_research_analyst(executed):
