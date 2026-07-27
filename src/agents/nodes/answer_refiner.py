@@ -43,5 +43,4 @@ def answer_refiner_node(state: GraphState) -> Dict[str, Any]:
         "messages": AIMessage(content=answer),
         "plan": "",
         "executed_agents": state.get("executed_agents", []) + ['answer_refiner'],
-        "resolved": True,
     }
