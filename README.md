@@ -1,22 +1,17 @@
 ```
-              ███╗   ███╗██╗   ██╗██╗  ████████╗██╗     █████╗  ██████╗ ███████╗███╗   ██╗████████╗
-              ████╗ ████║██║   ██║██║  ╚══██╔══╝██║    ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝
-              ██╔████╔██║██║   ██║██║     ██║   ██║    ███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║
-              ██║╚██╔╝██║██║   ██║██║     ██║   ██║    ██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║
-              ██║ ╚═╝ ██║╚██████╔╝███████╗██║   ██║    ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║
-              ╚═╝     ╚═╝ ╚═════╝ ╚══════╝╚═╝   ╚═╝    ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝
-                       ██████╗██╗  ██╗ █████╗ ████████╗██████╗  ██████╗ ████████╗
-                      ██╔════╝██║  ██║██╔══██╗╚══██╔══╝██╔══██╗██╔═══██╗╚══██╔══╝
-                      ██║     ███████║███████║   ██║   ██████╔╝██║   ██║   ██║
-                      ██║     ██╔══██║██╔══██║   ██║   ██╔══██╗██║   ██║   ██║
-                      ╚██████╗██║  ██║██║  ██║   ██║   ██████╔╝╚██████╔╝   ██║
-                       ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚═════╝  ╚═════╝    ╚═╝
-                                ~  powered by LangChain + LangGraph  ~
+   █████╗ ██████╗ ██╗ █████╗
+  ██╔══██╗██╔══██╗██║██╔══██╗
+  ███████║██████╔╝██║███████║
+  ██╔══██║██╔══██╗██║██╔══██║
+  ██║  ██║██║  ██╗██║██║  ██║
+  ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═╝
+    Adaptive Reasoning & Intelligence Agent
+          ~  powered by LangChain + LangGraph  ~
 ```
 
-# Multi-Agent Chatbot
+# ARIA — Adaptive Reasoning & Intelligence Agent
 
-A general-purpose AI chatbot powered by a team of specialized agents that collaborate to answer questions. It can search the web, read pages, run code, and chat over your own documents — all with cited sources.
+A general-purpose AI assistant powered by a team of specialized agents that collaborate to answer questions. It can search the web, read pages, run code, and chat over your own documents — all with cited sources.
 
 ![UI screenshot](ui.png)
 
