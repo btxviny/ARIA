@@ -8,6 +8,7 @@ Environment variables honored:
                    Docker on Windows/macOS so the container can reach the
                    native Ollama server running on the host.
   OPENAI_API_KEY   required when using the ChatOpenAI block.
+  MODEL    default gpt-5.4-mini
 """
 import os
 
@@ -19,6 +20,7 @@ from langchain_openai import ChatOpenAI
 dotenv.load_dotenv()
 
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+MODEL= os.environ.get("OPENAI_MODEL", "gpt-5.4-mini")
 
 
 # --- Ollama (local) ---
@@ -31,7 +33,6 @@ OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 #--- OpenAI (cloud) ---
 llm = ChatOpenAI(
     api_key=os.environ["OPENAI_API_KEY"],
-    #model="gpt-4o-mini",
-    model="gpt-5.4-mini",
+    model=MODEL,
     http_client=httpx.Client(verify=False),
 )
