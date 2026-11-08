@@ -204,6 +204,24 @@ def list_sessions(limit: int = 50) -> list[dict]:
         pool.putconn(conn)
 
 
+def get_run_ids(thread_id: str) -> list[str]:
+    """Distinct code-executor run ids referenced by a thread's messages."""
+    if not POSTGRES_URL:
+        return []
+    pool = _get_pool()
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT DISTINCT code_run_id FROM messages "
+                "WHERE thread_id = %s AND code_run_id IS NOT NULL AND code_run_id <> ''",
+                (thread_id,),
+            )
+            return [r[0] for r in cur.fetchall()]
+    finally:
+        pool.putconn(conn)
+
+
 def delete_session(thread_id: str) -> None:
     """Delete a session and all its messages (cascade)."""
     if not POSTGRES_URL:

@@ -1,0 +1,5 @@
+<resources>
+    <style name="Theme.ARIA" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#1F1E1D</item>
+    </style>
+</resources>

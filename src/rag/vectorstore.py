@@ -105,6 +105,14 @@ def delete_source(thread_id: str, source_id: str) -> bool:
     return True
 
 
+def delete_thread(thread_id: str) -> bool:
+    """Drop the thread's whole collection. Returns whether one existed."""
+    if not _collection_exists(thread_id):
+        return False
+    _get_client().delete_collection(_collection_name(thread_id))
+    return True
+
+
 def query(thread_id: str, query_text: str, k: int = RAG_TOP_K) -> List[Dict[str, Any]]:
     """Top-k relevant chunks for a query. Empty list if no sources are uploaded."""
     if not _collection_exists(thread_id):

@@ -11,7 +11,7 @@ import uuid
 from celery import Celery
 from loguru import logger
 
-from src.agents.graph import app as agent_graph
+from src.agents.graph import app as agent_graph, memory as graph_memory
 from src.config import CELERY_BROKER_URL, CELERY_RESULT_BACKEND, MAX_UPLOAD_MB
 from src.db import session_service
 from src.rag import ingest, vectorstore
@@ -173,3 +173,16 @@ def delete_source_task(thread_id: str, source_id: str) -> dict:
     except Exception as e:
         logger.exception(f"delete_source_task failed for thread_id={thread_id}, source_id={source_id}")
         return {"error": str(e), "thread_id": thread_id, "source_id": source_id}
+
+
+@app.task
+def delete_thread_data_task(thread_id: str) -> dict:
+    """Drop everything the worker holds for a thread: Chroma collection and agent memory."""
+    try:
+        dropped = vectorstore.delete_thread(thread_id)
+        if hasattr(graph_memory, "delete_thread"):
+            graph_memory.delete_thread(thread_id)
+        return {"deleted_collection": dropped, "thread_id": thread_id}
+    except Exception as e:
+        logger.exception(f"delete_thread_data_task failed for thread_id={thread_id}")
+        return {"error": str(e), "thread_id": thread_id}
