@@ -4,6 +4,8 @@
 *.pyc
 __pycache__/
 
+/.serena
+
 # Local runtime state (Chroma persistence, etc.)
 /data/
 .venv/
