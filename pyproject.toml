@@ -1,0 +1,63 @@
+[project]
+name = "aria"
+version = "0.1.0"
+description = "Adaptive Reasoning & Intelligence Agent"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # Web framework
+    "fastapi==0.162.2",
+    "uvicorn==0.54.0",
+    "pydantic==2.14.3",
+    # Async task queue
+    "celery==5.7.0",
+    "redis==8.1.0",
+    # UI
+    "streamlit==1.67.0",
+    "requests==2.34.2",
+    # LangChain / LangGraph
+    "langchain-core==1.7.6",
+    "langgraph==1.2.20",
+    "langchain-ollama==1.1.0",
+    "langchain-openai==1.7.4",
+    "openai==3.46.0",
+    "httpx==0.28.1",
+    # Web search & scraping
+    "tavily-python==0.8.5",
+    "trafilatura==2.3.1",
+    "lxml[html_clean]==6.1.3",
+    "urllib3==2.8.0",
+    # RAG
+    "chromadb==1.5.9",
+    "langchain-text-splitters==1.1.3",
+    "pypdf==7.0.0",
+    "langchain-huggingface==1.2.3",
+    "sentence-transformers==6.2.0",
+    "torch==2.15.0",
+    # Code executor sandbox libraries
+    "matplotlib==3.11.2",
+    "pandas==3.1.1",
+    "numpy==2.5.4",
+    "reportlab==5.1.0",
+    "fpdf2==2.9.0",
+    "scipy==1.18.1",
+    "pillow==13.0.0",
+    "openpyxl==3.1.5",
+    # Misc
+    "python-dotenv==1.2.4",
+    "pyyaml==6.0.3",
+    "loguru==0.7.3",
+    "psycopg2-binary==2.9.13",
+]
+
+# CPU-only torch on Linux: avoids the ~4GB CUDA build (no GPU in containers).
+[tool.uv.sources]
+torch = { index = "pytorch-cpu", marker = "sys_platform == 'linux'" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv]
+package = false

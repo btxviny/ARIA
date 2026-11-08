@@ -157,9 +157,8 @@ docker compose exec worker bash
 ### Command line
 
 ```bash
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-python chat_script.py
+uv sync                      # creates .venv from uv.lock (pinned versions)
+uv run python chat_script.py
 ```
 
 ---

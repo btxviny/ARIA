@@ -19,15 +19,21 @@ RUN apt-get update \
       curl \
  && rm -rf /var/lib/apt/lists/*
 
-# CPU-only torch, installed before requirements.txt so pip's resolver is
-# already satisfied by it and doesn't pull the ~4GB CUDA build that
-# sentence-transformers would otherwise resolve to -- these containers have
-# no GPU access, so CUDA torch is pure bloat.
-RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
+# uv: fast, reproducible installs from the committed uv.lock.
+COPY --from=ghcr.io/astral-sh/uv:0.11.32 /uv /uvx /bin/
 
-# Install Python deps first so subsequent code changes don't bust the cache.
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+# The venv lives outside /app so the dev compose override's `./:/app` bind
+# mount never shadows it. torch resolves to the CPU-only wheel (see
+# [tool.uv.sources] in pyproject.toml) -- no GPU in these containers.
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    PATH="/opt/venv/bin:$PATH"
+
+# Install deps first so subsequent code changes don't bust the cache.
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
 # Pre-bake the local embedding model's weights into the image so the first
 # RAG upload/query doesn't stall on a live download from huggingface.co.

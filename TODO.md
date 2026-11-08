@@ -31,8 +31,9 @@ Ordered by priority. Check items off as they land.
 
 ## 3. Packaging & Docker
 
-- [ ] Migrate `requirements.txt` to `pyproject.toml` + `uv` with a committed `uv.lock`
-- [ ] Pin dependency versions; split into groups (api, ui, worker, sandbox libs)
+- [x] Migrate `requirements.txt` to `pyproject.toml` + `uv` with a committed `uv.lock`
+- [x] Pin dependency versions
+- [ ] Split dependencies into groups (api, ui, worker, sandbox libs)
 - [ ] Multi-stage Dockerfile with separate slim `ui`/`api` and `worker` targets
 - [ ] Run containers as a non-root user; drop `build-essential` from final stage
 - [ ] Replace `./:/app` bind mounts in `docker-compose.override.yml` with `develop: watch`
