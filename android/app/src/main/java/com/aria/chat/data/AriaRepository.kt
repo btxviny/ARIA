@@ -45,6 +45,14 @@ class AriaRepository(initialBaseUrl: String) {
 
     suspend fun health(): Boolean = call { api.health().status == "ok" }
 
+    suspend fun sessions(): List<SessionInfo> = call { api.sessions() }
+
+    suspend fun messages(threadId: String): List<MessageInfo> = call { api.messages(threadId) }
+
+    suspend fun deleteSession(threadId: String) {
+        if (!call { api.deleteSession(threadId) }.isSuccessful) throw AriaException("Could not delete chat")
+    }
+
     /** Sends a question and polls until the task finishes. */
     suspend fun ask(prompt: String, threadId: String): ChatResult {
         val taskId = call { api.question(ChatRequest(prompt, threadId)).taskId }

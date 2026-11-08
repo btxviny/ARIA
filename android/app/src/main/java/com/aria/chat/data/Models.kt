@@ -54,3 +54,19 @@ data class DataFilesResponse(val files: List<DataFileInfo>)
 
 @Serializable
 data class HealthResponse(val status: String)
+
+@Serializable
+data class SessionInfo(
+    @SerialName("thread_id") val threadId: String,
+    val title: String = "",
+    @SerialName("updated_at") val updatedAt: String = "",
+    @SerialName("message_count") val messageCount: Int = 0,
+)
+
+@Serializable
+data class MessageInfo(
+    val role: String,
+    val content: String = "",
+    @SerialName("code_run_id") val codeRunId: String? = null,
+    @SerialName("code_files") val codeFiles: List<JsonObject>? = null,
+)

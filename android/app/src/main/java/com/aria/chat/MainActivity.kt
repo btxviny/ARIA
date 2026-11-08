@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.material3.MaterialTheme
+import com.aria.chat.ui.AriaTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aria.chat.ui.ChatScreen
 import com.aria.chat.ui.ChatViewModel
@@ -14,7 +14,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MaterialTheme {
+            AriaTheme {
                 ChatScreen(viewModel<ChatViewModel>())
             }
         }
